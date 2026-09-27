@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maker-controller-router"
+version = "0.1.0"
+description = "Shared Linux controller routing for maker projects"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Iain Bennett"}]
+
+[tool.setuptools.packages.find]
+include = ["router_shared*"]
+
+[tool.setuptools.package-data]
+router_shared = ["LICENSE"]

@@ -198,6 +198,24 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
+    def test_incomplete_bundle_fails_before_changing_services(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, installed = root / "source", root / "installed"
+            (source / "host").mkdir(parents=True)
+            (source / "host/portal-compose.yaml").write_text("services: {}\n")
+            with patch.object(portal_install, "SOURCE", source), \
+                 patch.object(portal_install, "DEST", installed), \
+                 patch.object(portal_install, "LEGACY", root / "legacy"), \
+                 patch.object(portal_install.os, "geteuid", return_value=1000), \
+                 patch.object(portal_install, "command") as command, \
+                 patch.object(portal_install, "app_listing") as listing:
+                with self.assertRaisesRegex(RuntimeError, "sketch.yaml"):
+                    portal_install.install()
+                command.assert_not_called()
+                listing.assert_not_called()
+                self.assertFalse(installed.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

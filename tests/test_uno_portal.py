@@ -38,65 +38,38 @@ class PortTests(unittest.TestCase):
 
 
 class SwitchTests(unittest.TestCase):
-    def test_zero_one_and_two_installed_states(self):
-        launcher = broker.Launcher()
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            apps = {key: dict(value, path=root / key) for key, value in broker.APPS.items()}
-            with patch.object(broker, "APPS", apps), patch.object(broker, "app_listing") as listing:
-                listing.return_value = {}
-                self.assertEqual(sum(item["installed"] for item in launcher.state()["apps"].values()), 0)
-                apps["virtualglove"]["path"].mkdir()
-                (apps["virtualglove"]["path"] / "app.yaml").write_text("name: VirtualGlove\n")
-                listing.return_value = {"VirtualGlove": "stopped"}
-                self.assertEqual(sum(item["installed"] for item in launcher.state()["apps"].values()), 1)
-                apps["rob_vision"]["path"].mkdir()
-                (apps["rob_vision"]["path"] / "app.yaml").write_text("name: R.O.B. Vision\n")
-                listing.return_value = {"VirtualGlove": "stopped", "R.O.B. Vision": "stopped"}
-                self.assertEqual(sum(item["installed"] for item in launcher.state()["apps"].values()), 2)
-
-    def test_game_blocks_switch_before_stopping_anything(self):
-        launcher = broker.Launcher()
-        actions = []
-        with patch.object(broker, "app_listing", return_value={"VirtualGlove": "running", "R.O.B. Vision": "stopped"}), \
-             patch.object(broker, "health", return_value=(True, True)), \
-             patch.object(broker, "cli", side_effect=lambda *a, **k: actions.append(a)):
-            launcher._switch("rob_vision")
-        self.assertEqual(actions, [])
-        self.assertIn("End the current game", launcher.error)
-
-    def test_success_stops_previous_then_starts_target_and_saves_default(self):
-        launcher = broker.Launcher()
-        actions = []
-        with patch.object(broker, "app_listing", return_value={"VirtualGlove": "running", "R.O.B. Vision": "stopped"}), \
-             patch.object(broker, "health", side_effect=[(True, False), (True, False)]), \
-             patch.object(broker, "configure_ports", side_effect=lambda key: actions.append(("ports", key))), \
-             patch.object(broker, "cli", side_effect=lambda *a, **k: actions.append(a)):
-            launcher._switch("rob_vision")
-        self.assertEqual([entry[1] for entry in actions if entry[0] == "app"], ["stop", "start"])
-        self.assertIn(("ports", "rob_vision"), actions)
-        self.assertTrue(any(entry[:3] == ("properties", "set", "default") for entry in actions))
-        self.assertEqual(launcher.error, "")
-
-    def test_failed_target_start_restores_previous_controller(self):
-        launcher = broker.Launcher()
-        actions = []
-        def app_command(*args, **_kwargs):
-            actions.append(args)
-            if args[:2] == ("app", "start") and args[2] == str(broker.APPS["rob_vision"]["path"]):
-                raise subprocess.CalledProcessError(1, args)
-        with patch.object(broker, "app_listing", return_value={"VirtualGlove": "running", "R.O.B. Vision": "stopped"}), \
-             patch.object(broker, "health", return_value=(True, False)), \
-             patch.object(broker, "configure_ports"), \
-             patch.object(broker, "cli", side_effect=app_command):
-            launcher._switch("rob_vision")
-        self.assertEqual([item[1] for item in actions if item[0] == "app"],
-                         ["stop", "start", "stop", "start"])
-        self.assertTrue(any(item[:3] == ("properties", "set", "default") for item in actions))
-        self.assertIn("returned non-zero", launcher.error)
+    def test_host_uses_running_services_without_app_lab_switching(self):
+        from uno_portal.host.concurrent import ConcurrentLauncher
+        self.assertIsInstance(broker.LAUNCHER, ConcurrentLauncher)
 
 
 class WebTests(unittest.TestCase):
+    def test_chooser_opens_running_services_and_serves_both_companions(self):
+        page = web.PAGE.read_text()
+        self.assertIn("Opening ' + names[key].name", page)
+        self.assertNotIn("Starting ' + names[key]", page)
+        self.assertIn("/assets/pixel-pal.png", page)
+        self.assertIn("/assets/buddy.png", page)
+        self.assertIn("port === 8101 ? '/dashboard/' : '/dashboard'", page)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            for path, kind in (("/", "text/html"),
+                               ("/assets/pixel-pal.png", "image/png"),
+                               ("/assets/buddy.png", "image/png")):
+                with self.subTest(path=path):
+                    conn = HTTPConnection("127.0.0.1", server.server_address[1])
+                    conn.request("GET", path)
+                    response = conn.getresponse()
+                    self.assertEqual(response.status, 200)
+                    self.assertIn(kind, response.getheader("Content-Type"))
+                    self.assertTrue(response.read())
+                    conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_cross_site_switch_is_rejected_and_same_origin_is_accepted(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)

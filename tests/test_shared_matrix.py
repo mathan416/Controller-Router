@@ -87,6 +87,8 @@ class LeaseTests(unittest.TestCase):
             with patch.object(ConcurrentLauncher, "_heartbeat", return_value=None), \
                  patch.object(matrix, "run", return_value=None):
                 launcher = ConcurrentLauncher(apps=apps, matrix=matrix)
+            for app in apps.values():
+                self.assertTrue((app["path"] / "data/controller-router-required").is_file())
             games = set()
             with patch.object(launcher, "_health", side_effect=lambda app: (True, app in games)), \
                  patch.object(launcher, "_matrix_ready", return_value=True), \

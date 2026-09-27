@@ -150,6 +150,21 @@ class WebTests(unittest.TestCase):
 
 
 class InstallerTests(unittest.TestCase):
+    def test_start_marks_router_required_without_changing_product_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = root / "rob-vision/data"
+            data.mkdir(parents=True)
+            settings = data / "controller-token"
+            settings.write_text("saved-pairing\n")
+            with patch.object(products, "ROOT", root), \
+                 patch.object(products, "product_compose", return_value=root / "runtime.json"), \
+                 patch.object(products.subprocess, "run"):
+                products.start("rob-vision")
+                products.start("rob-vision")
+            self.assertEqual(settings.read_text(), "saved-pairing\n")
+            self.assertEqual((data / "controller-router-required").read_text(), "1\n")
+
     def test_runtime_network_does_not_reuse_app_lab_network(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -179,7 +194,9 @@ class InstallerTests(unittest.TestCase):
                  patch.object(portal_install.os, "geteuid", return_value=1000), \
                  patch.object(portal_install, "command") as command:
                 self.assertIn("newer", portal_install.install())
-                command.assert_not_called()
+                self.assertEqual(command.call_args_list[0].args,
+                                 ("python3", str(installed / "host/products.py"), "start-all"))
+                self.assertEqual(len(command.call_args_list), 3)
 
 
 if __name__ == "__main__":

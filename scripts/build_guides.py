@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Build Controller Router's printable guides from maintained Markdown sources."""
 from pathlib import Path
+from datetime import date
 import re
 from html import escape
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted, LongTable, TableStyle, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted, LongTable, TableStyle, KeepTogether, Image
 from reportlab.graphics.shapes import Drawing, Rect, String, Line, Polygon
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,14 @@ def story(path):
         if not s:i+=1;continue
         if s.startswith('# '):i+=1;continue
         if s=='<!-- pagebreak -->':out.append(PageBreak());i+=1;continue
+        picture = re.fullmatch(r'!\[([^]]*)\]\(([^)]+)\)', s)
+        if picture:
+            image = Image(str(path.parent / picture.group(2)))
+            scale = min(WIDTH / image.imageWidth, 310 / image.imageHeight)
+            image.drawWidth, image.drawHeight = image.imageWidth * scale, image.imageHeight * scale
+            out.extend([image, Spacer(1, 8)])
+            i += 1
+            continue
         if s.startswith('```'):
             lang=s[3:];buf=[];i+=1
             while i<len(lines) and not lines[i].startswith('```'):buf.append(lines[i]);i+=1
@@ -96,17 +105,17 @@ def cover(canvas,doc,title,subtitle):
     canvas.setFont('Helvetica',12)
     for j,line in enumerate(subtitle):canvas.drawString(76,536-j*20,line)
     canvas.setFillColor(CORAL);canvas.setFont('Helvetica-Bold',11);canvas.drawString(76,180,'VIRTUALGLOVE  /  R.O.B. VISION  /  MAKER CONTROLLERS')
-    canvas.setFillColor(colors.HexColor('#a8c3cc'));canvas.setFont('Helvetica',10);canvas.drawString(76,149,'Current source edition | 28 September 2026')
+    canvas.setFillColor(colors.HexColor('#a8c3cc'));canvas.setFont('Helvetica',10);canvas.drawString(76,149,'Current source edition | ' + date.today().strftime('%d %B %Y'))
     canvas.restoreState()
 
 def body_page(canvas,doc,title):
     canvas.saveState();canvas.setStrokeColor(TEAL);canvas.line(48,800,A4[0]-48,800)
     canvas.setFillColor(NAVY);canvas.setFont('Helvetica-Bold',8);canvas.drawString(48,811,'CONTROLLER ROUTER')
     canvas.setFont('Helvetica',8);canvas.drawRightString(A4[0]-48,811,title)
-    canvas.setFillColor(colors.HexColor('#627986'));canvas.drawString(48,28,'Current source edition | 28 September 2026');canvas.drawRightString(A4[0]-48,28,str(doc.page))
+    canvas.setFillColor(colors.HexColor('#627986'));canvas.drawString(48,28,'Current source edition | ' + date.today().strftime('%d %B %Y'));canvas.drawRightString(A4[0]-48,28,str(doc.page))
     canvas.restoreState()
 
-GUIDES=[('INTEGRATION_GUIDE.md','Controller-Router-Integration-Guide.pdf','Integration Guide',['Build a unique controller for your game,','using shared routing and display APIs.']),('DEPLOYMENT_GUIDE.md','Controller-Router-Deployment-Guide.pdf','Deployment Guide',['Package the library and optional UNO Q runtime,','with safe upgrades and recovery.']),('TECHNICAL_REFERENCE.md','Controller-Router-Technical-Reference.pdf','Technical Reference',['Architecture, input leases, Matrix protocol,','console routing, and reusable integration.'])]
+GUIDES=[('PAIRING_GUIDE.md','Controller-Router-Pairing-Guide.pdf','Pairing Guide',['Connect your UNO Q and console once,','then play with either controller app.']),('USER_GUIDE.md','Controller-Router-User-Guide.pdf','User Guide',['Choose players and systems, test your pads,','and get back to your game.']),('INTEGRATION_GUIDE.md','Controller-Router-Integration-Guide.pdf','Integration Guide',['Build a unique controller for your game,','using shared routing and display APIs.']),('DEPLOYMENT_GUIDE.md','Controller-Router-Deployment-Guide.pdf','Deployment Guide',['Package the library and optional UNO Q runtime,','with safe upgrades and recovery.']),('TECHNICAL_REFERENCE.md','Controller-Router-Technical-Reference.pdf','Technical Reference',['Architecture, input leases, Matrix protocol,','console routing, and reusable integration.'])]
 
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
@@ -114,6 +123,10 @@ def main():
         p=OUT/name
         doc=SimpleDocTemplate(str(p),pagesize=A4,rightMargin=48,leftMargin=48,topMargin=57,bottomMargin=48,title=f'Controller Router {title}',author='Iain Bennett')
         doc.build([Spacer(1,1),PageBreak()]+story(ROOT/'docs'/source),onFirstPage=lambda c,d,t=title,s=subtitle:cover(c,d,t,s),onLaterPages=lambda c,d,t=title:body_page(c,d,t))
+        import shutil
+        bundled = ROOT / "uno_portal/python/guides"
+        bundled.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(p, bundled / name)
         print(p)
 
 if __name__=='__main__':main()

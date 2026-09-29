@@ -9,7 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("__init__.py", "controller_router.py", "merged_gamepad.py", "storage.py",
-         "launch.py", "launch_install.py", "systems.py", "retroarch_udev.py", "virtual_sources.py", "LICENSE")
+         "launch.py", "launch_install.py", "systems.py", "retroarch_udev.py", "virtual_sources.py", "LICENSE",
+         "pairing.py", "pairing_console.py", "pairing_adapter.py", "pairing_install.py")
 PORTAL = ROOT / "uno_portal"
 RETIRED_PORTAL = ("app.yaml", "bricks/local/host_bridge/brick_config.yaml",
                   "bricks/local/host_bridge/brick_compose.yaml")
@@ -28,6 +29,12 @@ def main() -> int:
     if not (args.virtualglove / "src/virtualglove/controller_router.py").is_file():
         parser.error("VirtualGlove repository was not found")
     drift = []
+    shared = PORTAL / 'shared'
+    if not args.check:
+        shared.mkdir(exist_ok=True)
+        (shared / '__init__.py').touch()
+        for name in ('pairing.py', 'pairing_console.py'):
+            shutil.copy2(ROOT / 'router_shared' / name, shared / name)
     for target in targets:
         if not args.check:
             target.mkdir(parents=True, exist_ok=True)

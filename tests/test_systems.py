@@ -28,6 +28,39 @@ class SystemsTests(unittest.TestCase):
         self.assertEqual({row['id'] for row in rows},{'nes','megadrive','psp','snes'})
         self.assertEqual(next(row['name'] for row in rows if row['id']=='megadrive'),'Mega Drive / Genesis')
         self.assertFalse(next(row['enabled'] for row in rows if row['id']=='psp'))
+    def test_readable_system_names_preserve_saved_ids(self):
+        expected = {'amstradcpc': 'Amstrad CPC', 'atarijaguar': 'Atari Jaguar',
+                    'ngp': 'Neo Geo Pocket', 'ngpc': 'Neo Geo Pocket Color',
+                    'zxspectrum': 'ZX Spectrum', 'sega32x': 'Sega 32X'}
+        config = {'physical_scope': 'systems', 'physical_systems': list(expected)}
+        for ident in expected:
+            folder = self.root / ident
+            folder.mkdir()
+            (folder / 'emulators.cfg').write_text('core = "/opt/retroarch -L core"')
+        rows = catalog('retropie', config, self.root)
+        self.assertEqual({row['id']: row['name'] for row in rows if row['id'] != 'nes'}, expected)
+        self.assertTrue(all(row['enabled'] for row in rows if row['id'] != 'nes'))
+        xml = self.root / 'systems.xml'
+        xml.write_text('<systemList>' + ''.join(
+            '<system><name>' + ident + '</name><fullname>' + ident.title() +
+            '</fullname><emulators><emulator name="libretro"/></emulators></system>'
+            for ident in expected) + '</systemList>')
+        self.assertEqual({row['id']: row['name'] for row in catalog('batocera', config, xml)
+                          if row['id'] != 'nes'}, expected)
+
+    def test_unknown_system_uses_emulationstation_fullname(self):
+        xml = self.root / 'systems.xml'
+        xml.write_text('<systemList><system><name>customconsole</name><fullname>My Custom Console</fullname></system></systemList>')
+        folder = self.root / 'customconsole'; folder.mkdir()
+        (folder / 'emulators.cfg').write_text('core = "/opt/retroarch -L core"')
+        rows = catalog('retropie', {}, self.root, systems_file=xml)
+        self.assertEqual(next(row['name'] for row in rows if row['id'] == 'customconsole'), 'My Custom Console')
+        # A saved selection keeps its readable name even if its registration is absent.
+        (folder / 'emulators.cfg').unlink()
+        rows = catalog('retropie', {'physical_scope': 'systems', 'physical_systems': ['customconsole']},
+                       self.root, systems_file=xml)
+        self.assertEqual(next(row['name'] for row in rows if row['id'] == 'customconsole'), 'My Custom Console')
+
     def test_new_default_and_old_client_preserves_scope(self):
         p=self.root/'config.json';store=router.RouterStore(p,'retropie',self.root/'es.xml',activity_check=lambda:False)
         self.assertEqual(store.read()['config']['physical_scope'],'nes')
@@ -54,6 +87,15 @@ class SystemsTests(unittest.TestCase):
         rows=catalog('batocera',{'physical_scope':'all'},p)
         self.assertIn('psp',{row['id'] for row in rows})
         self.assertNotIn('amiga',{row['id'] for row in rows})
+    def test_catalog_skips_invalid_entry_without_losing_later_systems(self):
+        p = self.root / 'systems.xml'
+        p.write_text('<systemList><system><name>../invalid</name></system><system><name>psp</name><emulators><emulator name="libretro"/></emulators></system></systemList>')
+        self.assertIn('psp', {row['id'] for row in catalog('batocera', {}, p)})
+    def test_unreadable_registration_does_not_break_catalog(self):
+        p = self.root / 'psp'; p.mkdir()
+        (p / 'emulators.cfg').write_text('core = "/opt/retroarch -L core"')
+        with patch.object(Path, 'read_text', side_effect=PermissionError('unreadable')):
+            self.assertEqual(catalog('retropie', {}, self.root)[0]['id'], 'nes')
     def test_retroarch_identity_from_environment(self):
         p=self.root/'123';p.mkdir();(p/'cmdline').write_bytes(b'/usr/bin/retroarch\0-L\0/core/genesis_plus_gx_libretro.so\0');(p/'environ').write_bytes(b'CONTROLLER_ROUTER_SYSTEM=mastersystem\0')
         self.assertEqual(router.running_retroarch_session(self.root),('genesis_plus_gx_libretro.so','mastersystem'))

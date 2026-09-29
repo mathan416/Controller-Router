@@ -25,7 +25,7 @@ The wheel is Python-only and does not need a CPU-specific build. It does not ins
 5. Import known EmulationStation mappings and add your custom source without deleting saved assignments.
 6. Start `ControllerRouterDevice` with explicit platform configuration paths.
 7. Expose bounded, authenticated setup operations through your project's service.
-8. Apply the merged output mapping to RetroArch and test the actual game.
+8. Install the session launch adapter, choose enabled systems, and test input in the actual game.
 
 Provide service startup, shutdown, watchdog, permissions, and logs in your installer. Keep personal configuration separate from replaceable software. Avoid creating a second competing Router process when another compatible integration already owns the merged outputs.
 
@@ -43,7 +43,7 @@ Route mapping changes through the Router integration. Receivers and game-specifi
 
 ## Optional UNO Q runtime
 
-The port-80 chooser links to **Setup** at `/setup`. This shared page lists console connections from whichever products are installed, supports player assignments and input checks, and blocks saving or restoring assignments while a game is active. It delegates to each product’s existing console API; it does not duplicate pairing credentials. Assignment changes take effect on the next launch.
+The port-80 chooser links to **Setup** for Players and Systems and to **Pair console** on HTTPS port 8444. Router owns the console registry and authenticated console management connection. Product adapters retain game actions and scoped app credentials. Assignment changes take effect on the next launch.
 
 The `uno_portal` directory supplies the browser chooser, host broker, product lifecycle service, lease coordinator, Matrix scheduler, and App Lab sketch. It is separate from the console wheel.
 
@@ -118,14 +118,30 @@ outputs block a routed launch. A Router failure requires the player to exit and
 relaunch after recovery. Test legacy and reservation modes independently, including
 keyboard controls, hotkeys, and physical-source reconnects.
 
-## Choose systems
+## Preserve system policy during deployment
 
-1. Open **Setup** at the UNO Q address and choose the paired console.
-2. Under **Systems**, choose **Controller Router** or **My existing setup** beside each system. Mega Drive / Genesis, PSP, and other systems can use different choices. These choices apply to Libretro emulators.
-3. Exit the running game, then choose **Save assignments**. The selection applies to the next launch.
+New format-2 configurations start with `physical_scope: "nes"`. Upgrades retain `nes`, `all`, or `systems` and any saved `physical_systems` list. Assignment-only requests from older clients preserve the existing policy.
 
-Buddy's games and VirtualGlove require Controller Router enabled for NES. NES can also use **My existing setup** when you want your own controls.
+The console adapter and input engine use the same canonical system ID. A disabled system receives no routing override and physical sources remain ungrabbed for that session. Keep merged output devices alive regardless of system policy. Standalone emulators bypass this integration.
 
-Fresh installations enable NES only. Upgrades retain existing selections. In individual selection mode, a newly added system uses **My existing setup**. **All Libretro systems** includes newly added systems too.
+Expose Players and Systems through your authenticated adapter, rather than writing configuration files from a browser. The [Technical Reference](TECHNICAL_REFERENCE.md#per-system-routing-policy) defines the fields; the [User Guide](USER_GUIDE.md) describes the Setup workflow.
 
-Router uses EmulationStation button mappings for enabled systems. **My existing setup** preserves the original launch arguments and adds no Router routing overrides. Router does not rewrite saved RetroArch configuration files when you save or start a game. Player assignments are shared across enabled systems.
+## RetroArch configuration precedence and upgrades
+
+Router appends its temporary settings after existing appended files. RetroArch can still load a core or game override afterward. A user override containing joypad indexes or reservations can therefore replace the session routing. Preserve unrelated game overrides; inspect controller-specific overrides when a game selects the wrong merged player despite correct launch diagnostics.
+
+During RetroPie installation or upgrade, Router backs up the FCEUmm and Nestopia core overrides and removes only `input_player1_joypad_index` through `input_player4_joypad_index` inside one recognized old Router block. Button bindings, hotkeys, unmarked indexes, and other settings remain. This migration is installer-only. Router never changes these files at receiver startup or game launch, and RetroPie configuration and profile files remain owned by `pi:pi`.
+
+## Shared device pairing
+
+Controller Router is the connection authority. The UNO Q host broker runs secure Setup on TCP **8444** and stores schema-1 connections under `/home/arduino/.local/state/controller-router/connections.json`. The persistent console TLS service listens on TCP **55359**. Router has a management credential; VirtualGlove and R.O.B. Vision have distinct, independently revocable credentials. Browser responses contain only public connection and readiness fields.
+
+`router_shared.pairing.Peer` checks the console certificate before sending a code or credential. The CR1 code contains a 100-bit certificate fingerprint prefix and a 60-bit authorization value. Console windows last 300 seconds, accept one successful transaction, and lock after five incorrect codes. Physical Matrix confirmation lasts 120 seconds and allows five attempts. Requests are bounded; servers allow at most 16 concurrent workers and require TLS 1.2 or later. Secure browser writes require matching HTTPS Origin, a fixed action header, and JSON content.
+
+Provisioning uses prepare, commit, and finalize. Private journals retain the previous Router registry and app configuration; interrupted or failed transactions restore those snapshots. Successful changes keep private before-connection backups. Legacy migration verifies an HMAC over a fresh nonce, canonical console ID, and observed TLS certificate; adoption signs the new connection transcript. Hostnames alone never authorize consolidation. Conflicting records remain unchanged for an explicit re-pairing choice.
+
+Products expose `/api/router-pairing` only to a capability-bearing local host request. Capability files are named `data/router-pairing-adapter-token` and must not be exposed to browsers. Adapters import app credentials into live caches without replacing ROM registries, calibration, or player settings. Router polls for newly installed console and UNO adapters and provisions them using its pinned management connection. Disabled app access stays disabled.
+
+The console helper has `/identity`, `/pair`, `/legacy-proof`, `/adopt`, `/manage`, and `/router` interfaces. `/manage` uses Router's credential for inspection, provisioning, and removal. `/router` uses the same credential with `RouterStore` revision checks for assignments and system policy. It never writes saved RetroArch configurations. Buddy's first-pair adapter adds only its Player 2 source to Router configuration; emulator configuration migration remains installation-only.
+
+Back up the UNO Q connection registry, its `tls` directory, and the private before-connection backups. On RetroPie, also back up `/var/lib/controller-router/link/{console-id,adapters.json,connection.json,certificate.pem,private-key.pem}` and each product's credential files. Restore requires the separately installed shared link service. Keep backups private; never include credentials in diagnostics or support reports. Do not snapshot a provisioning transaction in progress.

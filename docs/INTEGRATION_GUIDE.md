@@ -26,7 +26,7 @@ For a new controller, a fixed uinput device and source descriptor provide the cl
 7. Add a setup interface that calls Router's assignment API.
 8. Test the game's actual input, exit behavior, and disconnect recovery.
 
-Router does not detect ROMs, know game rules, interpret a sensor, authenticate your console pairing, or provide a generic game plugin loader. Those responsibilities stay with the host project.
+Router does not detect ROMs, know game rules, interpret a sensor, define your product-specific game credentials, or provide a generic game plugin loader. Those responsibilities stay with the host project.
 
 <!-- pagebreak -->
 
@@ -111,14 +111,12 @@ Router grants one active app lease. Your app and receiver must release input whe
 
 Keep merged outputs alive while physical pads sleep, wake, or reconnect. The shared launch adapter resolves their identities immediately before execution and supplies temporary legacy indexes or strict native reservations. A source reconnect must not recreate the merged outputs. If Router itself loses those outputs, require the player to end the game and relaunch after recovery. Test real wireless hardware as well as the automated reconnect fixture; see [Routing validation](ROUTING_VALIDATION.md).
 
-## Choose systems
+## Expose system choices
 
-1. Open **Setup** at the UNO Q address and choose the paired console.
-2. Under **Systems**, choose **Controller Router** or **My existing setup** beside each system. Mega Drive / Genesis, PSP, and other systems can use different choices. These choices apply to Libretro emulators.
-3. Exit the running game, then choose **Save assignments**. The selection applies to the next launch.
+Save system policy with player assignments through the same revision-checked configuration API. `physical_scope` accepts `nes`, `all`, or `systems`; selected mode uses `physical_systems` for canonical system IDs. Preserve the current policy when an older client updates only player assignments.
 
-Buddy's games and VirtualGlove require Controller Router enabled for NES. NES can also use **My existing setup** when you want your own controls.
+A disabled system keeps its original launch arguments and receives no Router routing overrides or physical-source forwarding. Keep merged outputs connected. The [Technical Reference](TECHNICAL_REFERENCE.md) defines validation and launch behavior; the [User Guide](USER_GUIDE.md) provides the player-facing Setup instructions.
 
-Fresh installations enable NES only. Upgrades retain existing selections. In individual selection mode, a newly added system uses **My existing setup**. **All Libretro systems** includes newly added systems too.
+## Use the shared connection authority
 
-Router uses EmulationStation button mappings for enabled systems. **My existing setup** preserves the original launch arguments and adds no Router routing overrides. Router does not rewrite saved RetroArch configuration files when you save or start a game. Player assignments are shared across enabled systems.
+Declare your installed console adapter with fixed credential and destination paths plus fixed restart and stop commands. Register its UNO adapter with a capability file. Reuse Router’s secure Pair console page instead of collecting SSH passwords. VirtualGlove imports its signed profile/input credential; R.O.B. Vision imports a console-scoped bearer credential and adds Buddy to Player 2. Keep game registries and actions in your product adapter.

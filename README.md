@@ -1,5 +1,7 @@
 # Controller Router library
 
+This checkout documents the current development version. The stable installer downloads the latest published final release; prerelease testing uses an explicit release tag.
+
 Shared, dependency-free Linux controller routing for maker projects. It discovers EmulationStation gamepads, persists stable Player 1–4 assignments, combines physical and virtual inputs into uinput gamepads, and maps those outputs into RetroArch.
 
 ## Guides

@@ -16,6 +16,61 @@ from uno_portal.host import products
 
 
 class PortTests(unittest.TestCase):
+    def test_secure_setup_can_be_ready_after_http(self):
+        from unittest.mock import MagicMock
+        response = MagicMock()
+        response.__enter__.return_value.status = 200
+        with patch.object(portal_install, 'urlopen', side_effect=[OSError('starting'), response]) as open_url, \
+             patch.object(portal_install.time, 'sleep') as pause:
+            portal_install.wait_secure_setup()
+        self.assertEqual(open_url.call_count, 2)
+        pause.assert_called_once_with(1)
+
+    def test_secure_setup_readiness_has_a_deadline(self):
+        with patch.object(portal_install, 'urlopen', side_effect=OSError('unavailable')) as open_url, \
+             patch.object(portal_install.time, 'sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'secure Setup'):
+                portal_install.wait_secure_setup()
+        self.assertEqual(open_url.call_count, 30)
+
+    def test_matrix_replacement_failure_restores_previous_app(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            matrix = root / 'matrix'; matrix.mkdir()
+            (matrix / 'previous').write_text('working firmware')
+            real_replace = portal_install.os.replace
+            def replace(source, destination):
+                if Path(source).name == 'matrix-stage':
+                    raise OSError('replacement failed')
+                return real_replace(source, destination)
+            with patch.object(portal_install, 'MATRIX', matrix), \
+                 patch.object(portal_install, 'MATRIX_STATE', root / 'state'), \
+                 patch.object(portal_install, 'command'), \
+                 patch.object(portal_install.os, 'replace', side_effect=replace):
+                with self.assertRaisesRegex(OSError, 'replacement failed'):
+                    portal_install.install_matrix_app()
+            self.assertEqual((matrix / 'previous').read_text(), 'working firmware')
+
+    def test_failed_upgrade_restores_both_units_and_product_startup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / 'old/host'; host.mkdir(parents=True)
+            units = root / 'units'; units.mkdir()
+            service = units / 'controller-router-portal.service'
+            product = units / 'controller-router-products.service'
+            for unit in (service, product):
+                (host / unit.name).write_text('previous unit ' + unit.name)
+                unit.write_text('failed candidate unit')
+            with patch.object(portal_install, 'DEST', host.parent), \
+                 patch.object(portal_install, 'SERVICE', service), \
+                 patch.object(portal_install, 'PRODUCT_SERVICE', product), \
+                 patch.object(portal_install, 'command') as command:
+                portal_install.restore_services()
+            for unit in (service, product):
+                self.assertEqual(unit.read_text(), (host / unit.name).read_text())
+                self.assertIn(unittest.mock.call('systemctl', '--user', 'start', unit.name, check=False), command.call_args_list)
+            self.assertEqual(command.call_args_list[0], unittest.mock.call('systemctl', '--user', 'daemon-reload', check=False))
+
     def test_installer_requires_and_copies_both_companion_images(self):
         with tempfile.TemporaryDirectory() as directory:
             staged = Path(directory) / 'launcher'
@@ -85,9 +140,74 @@ class WebTests(unittest.TestCase):
                     self.assertIn(kind, response.getheader("Content-Type"))
                     self.assertTrue(response.read())
                     conn.close()
+            with patch.object(web, 'ASSETS', Path('/nonexistent-router-assets')):
+                conn = HTTPConnection('127.0.0.1', server.server_address[1])
+                conn.request('GET', '/assets/buddy.png')
+                response = conn.getresponse()
+                self.assertEqual(response.status, 503)
+                response.read(); conn.close()
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_pairing_trust_routes_are_public_only(self):
+        server = ThreadingHTTPServer(('127.0.0.1', 0), web.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            with patch.object(web, 'broker', return_value={'certificate':'PUBLIC CERTIFICATE', 'fingerprint':'abc', 'token':'PRIVATE'}):
+                for path in ('/pair', '/api/pairing-certificate', '/controller-router.crt'):
+                    connection = HTTPConnection('127.0.0.1', server.server_address[1])
+                    connection.request('GET', path)
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    body = response.read().decode()
+                    self.assertNotIn('PRIVATE', body)
+                    if path == '/pair':
+                        self.assertIn('Instructions for your device', body)
+                        self.assertIn('data-platform="ios"', body)
+                    if path == '/controller-router.crt':
+                        self.assertEqual(body, 'PUBLIC CERTIFICATE')
+                        self.assertIn('attachment', response.getheader('Content-Disposition'))
+                    connection.close()
+        finally:
+            server.shutdown(); server.server_close()
+
+    def test_iphone_profile_contains_only_this_public_certificate(self):
+        import plistlib, ssl
+        from uno_portal.host.secure_pairing import certificates, public_certificate
+        with tempfile.TemporaryDirectory() as directory:
+            certificates(Path(directory))
+            public = public_certificate(directory)
+            self.assertEqual(set(public), {'certificate', 'fingerprint'})
+            server = ThreadingHTTPServer(('127.0.0.1', 0), web.Handler)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            try:
+                with patch.object(web, 'broker', return_value=public):
+                    connection = HTTPConnection('127.0.0.1', server.server_address[1])
+                    connection.request('GET', '/controller-router.mobileconfig')
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.getheader('Content-Type'), 'application/x-apple-aspen-config')
+                    profile = plistlib.loads(response.read()); connection.close()
+                    self.assertEqual(len(profile['PayloadContent']), 1)
+                    certificate = profile['PayloadContent'][0]
+                    self.assertEqual(certificate['PayloadType'], 'com.apple.security.root')
+                    self.assertEqual(certificate['PayloadContent'], ssl.PEM_cert_to_DER_cert(public['certificate']))
+            finally:
+                server.shutdown(); server.server_close()
+
+    def test_http_entry_does_not_accept_pairing_credentials(self):
+        server = ThreadingHTTPServer(('127.0.0.1', 0), web.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            with patch.object(web, 'broker') as call:
+                connection = HTTPConnection('127.0.0.1', server.server_address[1])
+                connection.request('POST', '/api/pairing', '{}', {'Content-Type':'application/json'})
+                response = connection.getresponse()
+                self.assertEqual(response.status, 404)
+                response.read(); connection.close(); call.assert_not_called()
+        finally:
+            server.shutdown(); server.server_close()
 
     def test_setup_routing_rejects_cross_site_and_forwards_same_origin(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
@@ -95,7 +215,8 @@ class WebTests(unittest.TestCase):
         port = server.server_address[1]
         try:
             with patch.object(web, 'broker', return_value={'targets':[]}) as call:
-                for origin, status in [('http://evil.example',403), (f'http://127.0.0.1:{port}',200)]:
+                for origin, status in [('http://evil.example',403), ('http://[invalid',403),
+                                       (f'http://127.0.0.1:{port}',200)]:
                     connection=HTTPConnection('127.0.0.1',port)
                     connection.request('POST','/api/routing','{"operation":"targets"}',
                                        {'Content-Type':'application/json','Origin':origin})

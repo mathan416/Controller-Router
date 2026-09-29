@@ -109,4 +109,16 @@ Router grants one active app lease. Your app and receiver must release input whe
 7. Test a software upgrade without losing assignments or pairing credentials.
 8. If using UNO Q ownership, test selection, lease expiry, game exit, and service failure.
 
-Wireless pads can change RetroArch device slots when they sleep or wake during a game. This remains a known hotplug issue. Connect intended pads before launch and relaunch after reconnecting. Do not claim live hotplug support until your integration passes that regression test.
+Keep merged outputs alive while physical pads sleep, wake, or reconnect. The shared launch adapter resolves their identities immediately before execution and supplies temporary legacy indexes or strict native reservations. A source reconnect must not recreate the merged outputs. If Router itself loses those outputs, require the player to end the game and relaunch after recovery. Test real wireless hardware as well as the automated reconnect fixture; see [Routing validation](ROUTING_VALIDATION.md).
+
+## Choose systems
+
+1. Open **Setup** at the UNO Q address and choose the paired console.
+2. Under **Systems**, choose **Controller Router** or **My existing setup** beside each system. Mega Drive / Genesis, PSP, and other systems can use different choices. These choices apply to Libretro emulators.
+3. Exit the running game, then choose **Save assignments**. The selection applies to the next launch.
+
+Buddy's games and VirtualGlove require Controller Router enabled for NES. NES can also use **My existing setup** when you want your own controls.
+
+Fresh installations enable NES only. Upgrades retain existing selections. In individual selection mode, a newly added system uses **My existing setup**. **All Libretro systems** includes newly added systems too.
+
+Router uses EmulationStation button mappings for enabled systems. **My existing setup** preserves the original launch arguments and adds no Router routing overrides. Router does not rewrite saved RetroArch configuration files when you save or start a game. Player assignments are shared across enabled systems.

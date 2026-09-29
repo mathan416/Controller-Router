@@ -96,14 +96,14 @@ def cover(canvas,doc,title,subtitle):
     canvas.setFont('Helvetica',12)
     for j,line in enumerate(subtitle):canvas.drawString(76,536-j*20,line)
     canvas.setFillColor(CORAL);canvas.setFont('Helvetica-Bold',11);canvas.drawString(76,180,'VIRTUALGLOVE  /  R.O.B. VISION  /  MAKER CONTROLLERS')
-    canvas.setFillColor(colors.HexColor('#a8c3cc'));canvas.setFont('Helvetica',10);canvas.drawString(76,149,'Current source edition | 27 September 2026')
+    canvas.setFillColor(colors.HexColor('#a8c3cc'));canvas.setFont('Helvetica',10);canvas.drawString(76,149,'Current source edition | 28 September 2026')
     canvas.restoreState()
 
 def body_page(canvas,doc,title):
     canvas.saveState();canvas.setStrokeColor(TEAL);canvas.line(48,800,A4[0]-48,800)
     canvas.setFillColor(NAVY);canvas.setFont('Helvetica-Bold',8);canvas.drawString(48,811,'CONTROLLER ROUTER')
     canvas.setFont('Helvetica',8);canvas.drawRightString(A4[0]-48,811,title)
-    canvas.setFillColor(colors.HexColor('#627986'));canvas.drawString(48,28,'Current source edition | 27 September 2026');canvas.drawRightString(A4[0]-48,28,str(doc.page))
+    canvas.setFillColor(colors.HexColor('#627986'));canvas.drawString(48,28,'Current source edition | 28 September 2026');canvas.drawRightString(A4[0]-48,28,str(doc.page))
     canvas.restoreState()
 
 GUIDES=[('INTEGRATION_GUIDE.md','Controller-Router-Integration-Guide.pdf','Integration Guide',['Build a unique controller for your game,','using shared routing and display APIs.']),('DEPLOYMENT_GUIDE.md','Controller-Router-Deployment-Guide.pdf','Deployment Guide',['Package the library and optional UNO Q runtime,','with safe upgrades and recovery.']),('TECHNICAL_REFERENCE.md','Controller-Router-Technical-Reference.pdf','Technical Reference',['Architecture, input leases, Matrix protocol,','console routing, and reusable integration.'])]

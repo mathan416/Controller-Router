@@ -43,6 +43,8 @@ Route mapping changes through the Router integration. Receivers and game-specifi
 
 ## Optional UNO Q runtime
 
+The port-80 chooser links to **Setup** at `/setup`. This shared page lists console connections from whichever products are installed, supports player assignments and input checks, and blocks saving or restoring assignments while a game is active. It delegates to each product’s existing console API; it does not duplicate pairing credentials. Assignment changes take effect on the next launch.
+
 The `uno_portal` directory supplies the browser chooser, host broker, product lifecycle service, lease coordinator, Matrix scheduler, and App Lab sketch. It is separate from the console wheel.
 
 The current installer expects the `arduino` account with UID 1000, App Lab, Docker Compose, user services, and the existing registered product layout. It is designed for the current VirtualGlove and R.O.B. Vision adapters. A new app must extend that registration; this is not a generic install command for an arbitrary third product.
@@ -86,3 +88,44 @@ Read the implementation before copying service paths or product assumptions:
 Test a clean install, repeat upgrade, preserved assignments, failed-start rollback, input release on disconnect, and live-game configuration rejection. For UNO Q, also test no-selection reboot, automatic game selection, missing or expired leases, display expiry, and a newly registered app alongside a newer Router.
 
 Record actual platform and device results. Keep build compatibility, mocked tests, and physical-device tests distinct in release notes.
+
+
+<!-- pagebreak -->
+
+## Register session routing
+
+Bundle `router_shared.launch` and `router_shared.launch_install` with the engine.
+On RetroPie, call `launch_install.install_retropie()` during installation or
+upgrade. It backs up replaced Router files, repairs only Router-owned profiles,
+and registers the adapter in existing `emulators.cfg` commands. It does not edit
+saved `retroarch.cfg` files. Repeating installation leaves unchanged files alone.
+
+On Batocera, call `install_batocera()` during installation and
+`activate_batocera()` during service startup. Installation validates the generator
+boundary before changing integration files. Startup binds the narrow generator
+overlay; it does not write saved RetroArch settings. Game hooks should report
+sessions only. A generation layout that cannot be identified stops installation.
+
+For another launcher, invoke `python3 -m router_shared.launch --config PATH
+--retroarch EXECUTABLE -- ORIGINAL_ARGUMENTS`. For preparation-only callers,
+`controller_router prepare-launch --platform PLATFORM --config PATH --retroarch
+EXECUTABLE --output SESSION_FILE` emits diagnostics and a temporary configuration.
+Append that file last, keep it for the process lifetime, and delete it afterward.
+The adapter handles that lifecycle, signals, exit status, and output-loss reporting.
+
+Do not recreate merged outputs during play. Missing or duplicate configured
+outputs block a routed launch. A Router failure requires the player to exit and
+relaunch after recovery. Test legacy and reservation modes independently, including
+keyboard controls, hotkeys, and physical-source reconnects.
+
+## Choose systems
+
+1. Open **Setup** at the UNO Q address and choose the paired console.
+2. Under **Systems**, choose **Controller Router** or **My existing setup** beside each system. Mega Drive / Genesis, PSP, and other systems can use different choices. These choices apply to Libretro emulators.
+3. Exit the running game, then choose **Save assignments**. The selection applies to the next launch.
+
+Buddy's games and VirtualGlove require Controller Router enabled for NES. NES can also use **My existing setup** when you want your own controls.
+
+Fresh installations enable NES only. Upgrades retain existing selections. In individual selection mode, a newly added system uses **My existing setup**. **All Libretro systems** includes newly added systems too.
+
+Router uses EmulationStation button mappings for enabled systems. **My existing setup** preserves the original launch arguments and adds no Router routing overrides. Router does not rewrite saved RetroArch configuration files when you save or start a game. Player assignments are shared across enabled systems.

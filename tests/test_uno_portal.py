@@ -2,6 +2,7 @@ import tempfile
 import threading
 import unittest
 import subprocess
+import shutil
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from json import loads
@@ -15,6 +16,24 @@ from uno_portal.host import products
 
 
 class PortTests(unittest.TestCase):
+    def test_installer_requires_and_copies_both_companion_images(self):
+        with tempfile.TemporaryDirectory() as directory:
+            staged = Path(directory) / 'launcher'
+            shutil.copytree(portal_install.SOURCE, staged,
+                            ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+            portal_install.validate_package(staged)
+            for name in ('pixel-pal.png', 'buddy.png'):
+                asset = staged / 'python/assets' / name
+                original = (portal_install.SOURCE / 'python/assets' / name).read_bytes()
+                self.assertEqual(asset.read_bytes(), original)
+                asset.unlink()
+                with self.assertRaisesRegex(RuntimeError, name):
+                    portal_install.validate_package(staged)
+                asset.write_bytes(b'')
+                with self.assertRaisesRegex(RuntimeError, name):
+                    portal_install.validate_package(staged)
+                asset.write_bytes(original)
+
     def test_web_ports_are_migrated_without_rewriting_other_ports(self):
         for app_id, original, expected in (
             ("virtualglove", "    - 80:8088\n    - 8088:8088\n    - 8443:8443\n",
@@ -55,7 +74,7 @@ class WebTests(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            for path, kind in (("/", "text/html"),
+            for path, kind in (("/", "text/html"), ("/setup", "text/html"),
                                ("/assets/pixel-pal.png", "image/png"),
                                ("/assets/buddy.png", "image/png")):
                 with self.subTest(path=path):
@@ -69,6 +88,22 @@ class WebTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_setup_routing_rejects_cross_site_and_forwards_same_origin(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        port = server.server_address[1]
+        try:
+            with patch.object(web, 'broker', return_value={'targets':[]}) as call:
+                for origin, status in [('http://evil.example',403), (f'http://127.0.0.1:{port}',200)]:
+                    connection=HTTPConnection('127.0.0.1',port)
+                    connection.request('POST','/api/routing','{"operation":"targets"}',
+                                       {'Content-Type':'application/json','Origin':origin})
+                    response=connection.getresponse();self.assertEqual(response.status,status)
+                    response.read();connection.close()
+                call.assert_called_once_with({'action':'routing','operation':'targets'})
+        finally:
+            server.shutdown();server.server_close()
 
     def test_cross_site_switch_is_rejected_and_same_origin_is_accepted(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)

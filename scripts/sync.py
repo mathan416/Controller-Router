@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("__init__.py", "controller_router.py", "merged_gamepad.py", "storage.py",
-         "retroarch_udev.py", "virtual_sources.py", "LICENSE")
+         "launch.py", "launch_install.py", "systems.py", "retroarch_udev.py", "virtual_sources.py", "LICENSE")
 PORTAL = ROOT / "uno_portal"
 RETIRED_PORTAL = ("app.yaml", "bricks/local/host_bridge/brick_config.yaml",
                   "bricks/local/host_bridge/brick_compose.yaml")
@@ -17,6 +17,7 @@ RETIRED_PORTAL = ("app.yaml", "bricks/local/host_bridge/brick_config.yaml",
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--library-only", action="store_true")
     parser.add_argument("--check", action="store_true", help="fail if a vendored copy differs")
     parser.add_argument("--rob-vision", type=Path, default=ROOT.parent / "rob-vision")
     parser.add_argument("--virtualglove", type=Path, required=True)
@@ -37,8 +38,8 @@ def main() -> int:
                     drift.append(str(destination))
             else:
                 shutil.copy2(source, destination)
-    for target in (args.rob_vision / "controller_router_portal",
-                   args.virtualglove / "controller_router_portal"):
+    for target in (() if args.library_only else (args.rob_vision / "controller_router_portal",
+                   args.virtualglove / "controller_router_portal")):
         for name in RETIRED_PORTAL:
             destination = target / name
             if args.check and destination.exists():

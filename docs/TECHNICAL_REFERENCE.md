@@ -156,7 +156,7 @@ EmulationStation provides the authoritative physical-controller mappings. Router
 
 The assignment document uses format version 2. It stores platform, players and their source mappings, the gesture player where applicable, and physical routing scope. The existing `virtualglove_player` field and `VirtualGlove Merged Player N` output names are retained for compatibility.
 
-`RouterStore` returns inventory, a document revision, and backup availability. A save resolves source IDs against authoritative discovered or saved mappings, checks the revision, validates the result, and keeps the previous document for rollback. Reconfiguration is blocked while a relevant RetroArch game is active. Product Setup provides the web controls; the library provides storage and routing.
+`RouterStore` returns inventory, a document revision, and backup availability. A save resolves source IDs against authoritative discovered or saved mappings, checks the revision, validates the result, and keeps the previous document for rollback. Reconfiguration is blocked while any Libretro game is active. Product Setup provides the web controls; the library provides storage and routing.
 
 | Platform | Default assignment document |
 | --- | --- |
@@ -166,7 +166,7 @@ The assignment document uses format version 2. It stores platform, players and t
 
 Product adapters can pass explicit configuration paths. Read the installed adapter and service before assuming a default. A `.previous` sibling stores the last assignment backup.
 
-Router discovers output devices and translates them into RetroArch's udev numbering. This index differs from a Linux `jsN` number. Its mapping application can update managed RetroArch configuration and Batocera's configuration. The exact destination files are selected by the platform and product adapter.
+Router resolves merged outputs by their unique names and vendor/product IDs immediately before RetroArch executes. Its udev slot differs from Linux `jsN` numbering. `prepare-launch` waits up to five seconds and rejects missing or duplicate identities. It writes a temporary session file; runtime routing never edits saved `retroarch.cfg` files. Assignment changes save Router's own configuration and take effect on the next launch.
 
 Atomic writes create a temporary sibling, flush and sync it, then replace the target. Existing permissions and ownership are retained; writes as root under `/opt/retropie/configs/` explicitly assign `pi:pi`. Product receivers and wrapped-game launchers must not separately rewrite those player assignments.
 
@@ -320,6 +320,48 @@ The suites exercise library storage and mappings, portal selection and browser p
 
 For a release candidate, record both install orders, repeat upgrades, one-app redirects, two-app chooser behavior, no-selection reboot, automatic game selection, first input, exit, manual-switch rejection, service loss, display expiry, and pairing. Verify preserved registry and assignment data and RetroPie ownership. Test each product's supported consoles and emulator cores separately.
 
-Wireless controllers sleeping or waking during a game can change RetroArch input slots. Stable saved source identities do not guarantee that a running emulator updates its selected slots. The current workaround is to connect intended controllers before launch and exit/relaunch after a reconnect. Do not describe this as fixed without a live hotplug regression test.
+The live uinput reconnect regression passed on RetroArch 1.19.1 and the separate 1.20.0 test build. Physical wireless-controller endurance testing remains a release check. Keep merged outputs alive throughout a game; if the Router process loses them, report the failure and require relaunch. See `docs/ROUTING_VALIDATION.md` for the evidence and its limits.
 
 One selected app owns a UNO Q game at a time. The current system does not combine VirtualGlove's gestures and Buddy's game input simultaneously. Console merging within the selected product and physical sources remains available. Pairing and platform-specific support are controlled by the products, not extended merely because this library recognizes a platform.
+
+
+## RetroArch compatibility and launch routing
+
+`router_shared.launch` owns session routing. `router_shared.launch_install` registers the integration during installation or upgrade and backs up replaced files. Both products bundle the same modules.
+
+| Mode | Selection | Behaviour |
+| --- | --- | --- |
+| Legacy udev | Installed RetroArch 1.19.1 and unknown builds | Resolve name plus VID/PID into the current udev slot immediately before execution. |
+| Native reservations | RetroArch 1.20.0 or newer with both reservation keys present in the selected executable | Set each unique merged name as a strict reservation (`device_reservation_type = 2`), with VID/PID independently validated during discovery. |
+
+Reservation strings use the unique name. RetroArch treats a VID/PID-prefixed reservation as a match on VID/PID alone; combining that prefix with a name would not validate both fields. The adapter still sets the initial numeric slot for diagnostics and startup consistency. For native reservations, it seeds a complete permutation of all 16 initial indexes, preserving the configured merged outputs. RetroArch 1.20.0 can crash in its reservation allocator when duplicate initial indexes leave holes in its inverse map; the temporary permutation prevents that failure.
+
+On RetroPie, the installer wraps existing RetroArch commands in `emulators.cfg`. Environment assignments, core arguments, ROM arguments, native hand-input options, cabinet hooks, and existing appended files remain in place. The adapter adds its temporary configuration last in the append chain. The selected executable remains unchanged. PSP and other ordinary Libretro games use the same path. If Router is not configured, the adapter passes the command through.
+
+On Batocera, the installer validates the Libretro generator's final command boundary and installs a narrow module overlay. It adds the adapter after generation, before execution. Game-start hooks only report sessions: they run before configgen and cannot supply reliable final routing. Unsupported generator layouts stop installation rather than guessing at a patch. The overlay is reapplied at boot against the installed generator so upstream changes are retained.
+
+The root-owned Router configuration stays private. A public runtime manifest at `/run/virtualglove/controller-router-launch.json` contains only enabled output numbers and platform; the unprivileged RetroPie adapter can use it without reading physical source settings or pairing credentials.
+
+### Wireless disconnects and recovery
+
+Merged outputs persist while physical pads sleep, wake, disconnect, or reconnect. Router reconnects each source to its saved player and refreshes frontend mappings between games. It does not recreate the merged outputs during a live game. Idle assignment edits retain existing outputs, keep newly unassigned outputs neutral, and create only newly required players. Diagnostic logs include mode, name, VID/PID, event node, and launch slot.
+
+The adapter forwards termination signals and waits for RetroArch. On Linux, its child also receives a parent-death signal if a frontend forcibly kills the adapter. An unconfigured adapter replaces itself with the original executable, retaining the frontend's normal process lifetime. These paths avoid leaving an emulator running behind a closed launcher.
+
+A process-lifetime ownership lock at `/run/virtualglove/controller-router-owner.lock` prevents concurrent product startup from creating duplicate merged outputs or replacing the shared socket. The lock records the owning process ID for service discovery; the open file lock, not that recorded number alone, grants ownership.
+
+A Router restart removes those persistent devices. The adapter reports that the game must be relaunched, and Router refuses to recreate outputs while RetroArch is playing. End the game, wait for Router to become ready, then relaunch. Recreating devices midway through a legacy session cannot safely recover its original slots.
+
+### Validation scope
+
+Live evidence is recorded in `docs/ROUTING_VALIDATION.md`. Legacy validation targets Linux's udev joypad driver. Do not infer support for another driver or an untested platform version from successful identity resolution alone.
+
+## Per-system routing policy
+
+The format-2 document accepts `physical_scope` values `nes`, `all`, and `systems`. Selected mode stores canonical console IDs in `physical_systems`; an empty list disables routing for every system. Existing documents without a scope retain their released all-system behavior. New configurations start with NES only. Assignment-only saves from older clients preserve the current policy.
+
+The read API includes a `systems` catalogue with ID, display name, and enabled state. System selections use the existing revision-checked save and rollback operations. Discover newly installed systems without enabling them in selected mode.
+
+RetroPie emulator registrations and Batocera configgen pass `--system` to the Router adapter. The adapter supplies `CONTROLLER_ROUTER_SYSTEM` to the RetroArch process; the input service reads that same identity from its process environment. Core names do not distinguish systems sharing an emulator. A compatibility fallback reads the RetroPie system configuration path, or recognizes known NES cores for older NES-only launches. Selected mode with no known system passes through without routing.
+
+Disabled launches preserve the original frontend arguments and add no Router settings. The input service leaves physical sources ungrabbed and does not forward them for that session. Merged output devices remain alive. Global, system, and override RetroArch configurations remain untouched.

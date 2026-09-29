@@ -10,6 +10,21 @@ they do not describe an already published release.
 | retropieconsole, Raspberry Pi, ARM Linux | Installed 1.19.1 | Legacy udev | Actual RetroPad reads, keyboard Start, exit hotkey, source reconnects, five bounded core boots |
 | Same console, separate upstream v1.20.0 build | 1.20.0 | Strict native reservations | Same input trace and reconnect tests; installed RetroArch was not replaced |
 | Batocera 43.1, x86_64 | Installed 1.22.2 | Strict native reservations | Installed configgen command generation, five bounded core boots, repeat integration installation |
+| Recalbox 10.1.1, `rpizero2` target, ARMv7 | Installed 1.22.2 | Strict native reservations | Paired to UNO Q; Gyromite, Stack-Up, and Super Glove Ball each launched through the installed generator adapter and exited cleanly in bounded tests on 29 September 2026 |
+
+The Recalbox game checks stopped EmulationStation briefly so RetroArch could
+take the display; the menu was restored after each check. The UNO Q reported
+Gyromite and Stack-Up sessions and cleared each on exit. These checks establish
+startup, routing selection, and session reporting. They do not establish a
+complete human-played command sequence or Player 1 button response on Recalbox.
+With the receiver in trace mode, the Gyromite FCEUmm wrapper also delivered a
+frame packet to the receiver's Unix socket; the receiver identified its sender
+PID and game. The trace began with neutral frame `N`. Normal receiver and menu
+services were restored afterward.
+
+During a bounded Super Glove Ball launch on the same Recalbox host, Router
+selected VirtualGlove, marked its game active, and kept R.O.B. Vision
+unselected. After exit, Router returned to no selection with the Matrix ready.
 
 The separate 1.20.0 executable was built from upstream tag `v1.20.0`, with
 udev enabled and graphics/audio backends omitted for the input trace. It is a

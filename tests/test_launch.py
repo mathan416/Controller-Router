@@ -99,6 +99,15 @@ class LaunchTests(unittest.TestCase):
                 indexes = re.findall(r'input_player\d+_joypad_index = "(\d+)"', output.read_text())
                 self.assertEqual(sorted(map(int,indexes)), list(range(16)))
             self.assertNotIn('input_exit_emulator',output.read_text())
+    def test_recalbox_exit_uses_merged_start_without_changing_saved_config(self):
+        config={'platform':'recalbox', 'players':[], 'virtualglove_player':1}
+        output=self.root/'session.cfg'
+        identity={1:{'player':1,'name':'VirtualGlove Merged Player 1','slot':1}}
+        with patch.object(launch,'compatibility',return_value='native-reservations'):
+            launch.prepare(config, Path('/fake'), output, resolver=lambda players:identity)
+        text=output.read_text()
+        self.assertIn('input_enable_hotkey_btn = "12"', text)
+        self.assertIn('input_exit_emulator_btn = "11"', text)
     def test_profiles_repair_identity_preserve_extra_hotkeys(self):
         owned=self.root/'VirtualGlove Merged Player 1.cfg'
         owned.write_text('input_device = "Wrong"\ninput_exit_emulator_btn = "14"\n')
@@ -125,9 +134,22 @@ class LaunchTests(unittest.TestCase):
         patched=patch_batocera_generator(original, '/userdata/router/adapter')
         self.assertEqual(patch_batocera_generator(patched, '/userdata/router/adapter'), patched)
         self.assertIn('other_setting = 7', patched)
-        self.assertLess(patched.index('session adapter'),patched.index('return Command'))
         with self.assertRaisesRegex(RuntimeError,'Unsupported'):
             patch_batocera_generator('changed upstream format', '/adapter')
+
+    def test_recalbox_generator_uses_python_for_nonexecutable_share(self):
+        from router_shared.launch_install import patch_recalbox_generator
+        original = ('        other_setting = 7\n'
+                    '        return Command(videomode=system.VideoMode, array=commandArray, '
+                    'env=env, preExec=pre, postExec=post)\n')
+        patched = patch_recalbox_generator(original, '/recalbox/share/system/router/adapter')
+        self.assertEqual(patch_recalbox_generator(patched, '/recalbox/share/system/router/adapter'), patched)
+        self.assertIn('other_setting = 7', patched)
+        self.assertIn('["/usr/bin/python3",', patched)
+        self.assertIn('"--system", system.Name', patched)
+        with self.assertRaisesRegex(RuntimeError, 'Unsupported Recalbox'):
+            patch_recalbox_generator('changed generator', '/adapter')
+        self.assertLess(patched.index('session adapter'),patched.index('return Command'))
     def test_version_and_feature_detection_both_required(self):
         binary=self.root/'retroarch';binary.write_bytes(b'reserved_device device_reservation_type')
         with patch.object(launch.subprocess,'run',return_value=type('Result',(),{'returncode':0,'stdout':'RetroArch - Frontend\nVersion: 1.20.0'})()):

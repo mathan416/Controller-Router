@@ -6,6 +6,11 @@ Finish the game before pairing, changing app access, or removing a connection. E
 
 ## Connect
 
+After installing either controller product on a Recalbox console, run
+`sh /recalbox/share/system/controller-router/pair-console` in its terminal to
+open a fresh five-minute connection window. The Router Pair console page lists
+the matching commands for RetroPie and Batocera too.
+
 1. Open **Apps > Setup > Pair console**. Both product Setup pages have an **Open Pair console** link to this same page.
 2. Open the secure address printed by the UNO Q installer, using its `.local` name or LAN IP. Pairing uses HTTPS port **8444**.
 3. Before accepting the local certificate, compare the browser's SHA-256 fingerprint with the fingerprint printed by the UNO Q installer. During confirmation, its beginning also appears after **ID** on the Matrix. Stop if they differ.

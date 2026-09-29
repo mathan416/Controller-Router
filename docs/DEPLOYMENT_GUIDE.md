@@ -106,6 +106,15 @@ boundary before changing integration files. Startup binds the narrow generator
 overlay; it does not write saved RetroArch settings. Game hooks should report
 sessions only. A generation layout that cannot be identified stops installation.
 
+On Recalbox 10.x, call `install_recalbox()` during installation and
+`activate_recalbox()` during service startup. The installer stages a patched
+Libretro generator in the persistent share; startup mounts it over Recalbox's
+read-only generator. The generated command runs the Router adapter through
+`/usr/bin/python3` because the Recalbox share is not executable. The adapter
+adds temporary session settings only when the system is enabled. Test a game
+from EmulationStation or stop its menu before a remote launch: the menu holds
+the display and a simultaneous RetroArch launch fails to initialize video.
+
 For another launcher, invoke `python3 -m router_shared.launch --config PATH
 --retroarch EXECUTABLE -- ORIGINAL_ARGUMENTS`. For preparation-only callers,
 `controller_router prepare-launch --platform PLATFORM --config PATH --retroarch

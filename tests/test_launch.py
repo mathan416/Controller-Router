@@ -6,6 +6,13 @@ from router_shared import launch
 from router_shared.launch_install import wrap_commands, repair_profiles
 
 class LaunchTests(unittest.TestCase):
+    def test_retired_merged_commands_cannot_write_saved_config(self):
+        from router_shared import merged_gamepad
+        self.assertFalse(hasattr(merged_gamepad, 'install_retroarch_assignment'))
+        self.assertFalse(hasattr(merged_gamepad, 'MergedGamepadDevice'))
+        with self.assertRaisesRegex(SystemExit, 'serve and sync-index commands are retired'):
+            merged_gamepad.main()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

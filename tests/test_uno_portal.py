@@ -16,6 +16,29 @@ from uno_portal.host import products
 
 
 class PortTests(unittest.TestCase):
+    def test_legacy_boot_cleanup_is_narrow_and_repeatable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            unit = home / '.config/systemd/user/virtualglove-early-start.service'
+            trial = unit.with_name('virtualglove-early-start-trial.service')
+            helper = home / '.local/lib/virtualglove/uno-q-early-start.py'
+            for path in (unit, trial, helper):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('obsolete')
+            current = unit.with_name('controller-router-products.service')
+            current.write_text('current')
+            other = helper.with_name('keep.py')
+            other.write_text('unrelated')
+            with patch.object(portal_install, 'HOME', home), patch.object(portal_install, 'command') as command:
+                portal_install.retire_early_start()
+                count = command.call_count
+                portal_install.retire_early_start()
+                self.assertEqual(command.call_count, count)
+                command.assert_any_call('systemctl', '--user', 'disable', '--now', unit.name, check=False)
+            self.assertTrue(all(not path.exists() for path in (unit, trial, helper)))
+            self.assertEqual(current.read_text(), 'current')
+            self.assertEqual(other.read_text(), 'unrelated')
+
     def test_secure_setup_can_be_ready_after_http(self):
         from unittest.mock import MagicMock
         response = MagicMock()

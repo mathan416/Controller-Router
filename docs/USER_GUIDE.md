@@ -69,7 +69,7 @@ Launch a registered game on your paired console. Router selects VirtualGlove or 
 
 To open an app yourself, visit the UNO Q address. With one app installed, it opens directly. With both installed, choose VirtualGlove or R.O.B. Vision. **Apps** in either app returns to the chooser; it appears only when both are installed. Finish a game before changing apps manually. Both apps stay available in the background.
 
-After a reboot, the UNO Q waits for a game or your choice. You do not need to reinstall or pair again.
+After the startup heart, an animated hourglass shows that the UNO Q is still starting. When the installed controller apps are ready, the Matrix shows Router’s neutral animation. After a reboot, the UNO Q waits for a game or your choice. You do not need to reinstall or pair again.
 
 ## Get back to your game
 

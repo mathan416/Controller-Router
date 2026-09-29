@@ -95,6 +95,10 @@ R.O.B. Vision retains pending frame actions for up to 12 seconds while waiting f
 
 <!-- pagebreak -->
 
+## Matrix startup display
+
+After the board's protected heart animation, the shared sketch animates an hourglass independently of Linux and the Bridge. The host acknowledges startup through authenticated `POST /ready` on the private Matrix service only after all installed product services report ready. Missing acknowledgement leaves the hourglass running. Valid product or pairing frames take precedence and end the loading state. Once startup is complete, expired frames return to the neutral Router animation rather than the hourglass.
+
 ## Matrix manifests and request protocol
 
 Apps are identified as `virtualglove` and `rob_vision`. Their animation manifests use schema 1 and must identify the same app. A manifest contains named animations, each with a boolean `loop` and a sequence of frames.

@@ -3,6 +3,7 @@ import threading
 import unittest
 import subprocess
 import shutil
+import re
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from json import loads
@@ -112,6 +113,11 @@ class PortTests(unittest.TestCase):
                     portal_install.validate_package(staged)
                 asset.write_bytes(original)
 
+            help_page = staged / 'python/help.html'
+            help_page.unlink()
+            with self.assertRaisesRegex(RuntimeError, 'python/help.html'):
+                portal_install.validate_package(staged)
+
     def test_web_ports_are_migrated_without_rewriting_other_ports(self):
         for app_id, original, expected in (
             ("virtualglove", "    - 80:8088\n    - 8088:8088\n    - 8443:8443\n",
@@ -153,6 +159,7 @@ class WebTests(unittest.TestCase):
         thread.start()
         try:
             for path, kind in (("/", "text/html"), ("/setup", "text/html"),
+                               ("/help", "text/html"), ("/help.html", "text/html"),
                                ("/assets/pixel-pal.png", "image/png"),
                                ("/assets/buddy.png", "image/png")):
                 with self.subTest(path=path):
@@ -169,6 +176,33 @@ class WebTests(unittest.TestCase):
                 response = conn.getresponse()
                 self.assertEqual(response.status, 503)
                 response.read(); conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_help_is_directly_available_and_every_guide_link_works(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            conn = HTTPConnection("127.0.0.1", server.server_address[1])
+            conn.request("GET", "/help")
+            response = conn.getresponse()
+            self.assertEqual(response.status, 200)
+            help_page = response.read().decode()
+            self.assertIn("Get ready to play", help_page)
+            guides = set(re.findall(r'href="(/guides/Controller-Router-[^"]+\.pdf)"', help_page))
+            self.assertEqual(len(guides), 5)
+            for path in guides:
+                with self.subTest(guide=path):
+                    conn.request("GET", path)
+                    guide = conn.getresponse()
+                    self.assertEqual(guide.status, 200)
+                    self.assertEqual(guide.getheader("Content-Type"), "application/pdf")
+                    self.assertTrue(guide.read().startswith(b"%PDF-"))
+            conn.close()
+            for page in ("index.html", "setup.html", "trust.html"):
+                self.assertIn('href="/help"', web.PAGE.with_name(page).read_text())
+            self.assertIn("root+'help'", (web.PAGE.parent.parent / 'host/pairing.html').read_text())
         finally:
             server.shutdown()
             server.server_close()

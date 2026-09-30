@@ -1,7 +1,7 @@
 # Controller Router guides
 
 - [User Guide](USER_GUIDE.md): choose players and systems, test a pad, and recover a game.
-- [Pairing Guide](PAIRING_GUIDE.md): connect the UNO Q and console once, check app readiness, and manage access.
+- [Pairing Guide](PAIRING_GUIDE.md): connect a console once, check app readiness, and manage access.
 - [Integration Guide](INTEGRATION_GUIDE.md): build a unique controller integration, choose an input boundary, and use assignment APIs.
 - [Deployment Guide](DEPLOYMENT_GUIDE.md): package the console library, optional UNO Q runtime, upgrades, and recovery.
 - [Technical Reference](TECHNICAL_REFERENCE.md): architecture, API examples, leases, Matrix protocol, storage, and extension boundaries.

@@ -1,35 +1,38 @@
-# Controller Router library
+# Controller Router
 
-This checkout documents the current development version. The stable installer downloads the latest published final release; prerelease testing uses an explicit release tag.
+Controller Router puts each gamepad with the player you choose. It combines configured physical and maker-controller inputs into stable Players 1–4 for RetroArch, while keeping EmulationStation button mappings. You can use it for NES alone, selected Libretro systems, or all supported Libretro systems. **My existing setup** leaves a system's normal controls in place.
 
-Shared, dependency-free Linux controller routing for maker projects. It discovers EmulationStation gamepads, persists stable Player 1–4 assignments, combines physical and virtual inputs into uinput gamepads, and maps those outputs into RetroArch.
+VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consoles and controller. Those installers install or upgrade Router; there is no separate player installation step. VirtualGlove's Windows LaunchBox path uses its own input integration. This checkout describes the current development version. A published product installer may contain an earlier Router version, so follow the guide included with that release.
 
-## Guides
+## Get started
 
-See the [documentation library](docs/README.md) for the Integration Guide, Deployment Guide, and Technical Reference. Printable PDF editions are in [output/pdf](output/pdf/).
+- [User Guide](docs/USER_GUIDE.md): choose players and systems, test a pad, and recover a game.
+- [Pairing Guide](docs/PAIRING_GUIDE.md): connect a console once and check each app's access.
+- [Integration Guide](docs/INTEGRATION_GUIDE.md): add an unusual controller or game.
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
+- [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behavior.
 
-## UNO Q controller launcher
+The controller's **Help** page offers shorter, task-based instructions and links to the printable PDFs in [output/pdf](output/pdf/). The [documentation library](docs/README.md) is the complete reading map.
 
-The installer makes Controller Router the App Lab startup app on initial and
-repeat installs, even if another app was previously selected.
+## On the console
 
-The `uno_portal` package is the shared UNO Q entry page and Matrix owner for VirtualGlove and R.O.B. Vision. Both installers bundle the same versioned package. It owns port 80; VirtualGlove's browser uses port 8100 and R.O.B. Vision's uses 8101. VirtualGlove secure pairing remains on 8443, and R.O.B. Vision's console receiver remains on 8766. A registered game session automatically selects its controller and returns Router to neutral when it ends; no browser is required for game input. With one controller installed, opening the UNO Q address selects and opens it. With both installed, the page lets a user choose and shows Pixel Pal and Buddy beside their respective app buttons. It opens the selected app’s already-running website; the chooser does not start or stop product services. **Apps** appears in product navigation only when both products are installed. A direct top-level visit to either product's browser port selects that product too. Manual selection is blocked during a live game.
+Router discovers physical controllers configured in EmulationStation and combines their inputs with assigned virtual sources. Saved player assignments and system choices survive upgrades. Fresh configurations use Router for NES only; existing choices remain when an installation is upgraded. A game must end before assignments change.
 
-Controller Router owns the only App Lab sketch and the 13×8 Matrix. Each product supplies a versioned grayscale animation manifest; a local request protocol plays named animations, a short status label, or a temporary pairing display. Requests from the unselected app are rejected, and stale requests expire. When no app is selected, the Matrix shows Router's neutral animation. Both product Linux services run continuously in separate Compose projects; their own sketches are not started or flashed during normal installation. Router grants one renewable controller input lease at a time and revokes it before granting another. At boot no lease is granted. Leases contain the current boot ID, are renewed about every 250 ms, and expire after two seconds. A Router-managed product rejects a missing or invalid lease as well as an expired one. The selected app’s console input stops when the lease expires or Router stops. If both products report live sessions simultaneously, Router releases both rather than granting concurrent input.
+When a routed RetroArch game starts, Router resolves its merged gamepads by identity and supplies settings for that launch. Runtime routing does not rewrite saved `retroarch.cfg` files. It supports the legacy numeric-slot path and a native reservation path where the selected RetroArch build supports it. Wireless pads can sleep and reconnect without changing their merged player output; if Router itself loses that output during play, exit and relaunch the game after recovery.
 
-The port-80 browser container talks only to a private Compose bridge and a user-owned Unix socket. The host helper accepts fixed app identifiers and cannot edit console controller assignments. Those remain in each product's Setup page. Existing pairing, game registries, and controller assignments remain in place during upgrades. The installer backs up software and restores the previous working version if startup fails. If a newer Router is already installed, it keeps that version and still registers and starts a newly installed product. First Matrix compilation through App Lab can take several minutes.
+VirtualGlove chooses its gesture player, and R.O.B. Vision places Buddy on Player 2. Game profiles, ROM filenames, emulator wrappers, and game actions remain in those products.
 
-R.O.B. Vision and VirtualGlove vendor the same `router_shared` package from this directory. Project-specific setup remains in their own adapters: R.O.B. Vision adds Buddy to Player 2; VirtualGlove chooses its gesture player and handles its pairing protocol.
+## On the controller
 
-Run `python3 scripts/sync.py --virtualglove /path/to/PowerGlove` here to update both projects. Add `--check` to detect drift. Do not edit a vendored copy directly. The package has no network or ROM dependencies; Linux uinput, udev and RetroArch are required for live routing.
+The optional portal is the entry page and Matrix display owner for the two current apps. It uses port 80; VirtualGlove's site uses 8100 and R.O.B. Vision's uses 8101. With one app installed, opening the controller address opens it. With both installed, **Apps** lets you choose. Both app services stay running. A registered game selects its app automatically, so a browser does not need to stay open for input. Manual switching waits until the game ends.
 
-## Host-project boundary
+Router owns the shared 13×8 Matrix firmware. Product manifests define their animations, and a local request API displays the selected app's cues. When no app is selected, Router shows its neutral animation. One renewable input lease allows only the selected app to control a game; an absent, expired, or conflicting lease releases input.
 
-The library maintains the version 2 Player 1–4 assignment document and the
-`VirtualGlove Merged Player N` device names used by existing installations.
-A host project chooses when to install, pair, activate, and reconfigure it. It
-may describe a fixed virtual gamepad in a small JSON file and set
-`CONTROLLER_ROUTER_SOURCES_FILE` for the Router service:
+Pairing is also shared. Choose **Pair console** from Apps to open Router's secure setup page on HTTPS port 8444. One confirmed console connection provisions separate private credentials for whichever supported apps are installed. Adding the other app later can provision it without pairing again. See the [Pairing Guide](docs/PAIRING_GUIDE.md) for the code, certificate, and Matrix confirmation steps.
+
+## Extend Router
+
+The dependency-free `router_shared` package exposes player assignment and input-routing APIs. A host project can supply a fixed virtual gamepad descriptor through `CONTROLLER_ROUTER_SOURCES_FILE`, then assign that source through `RouterStore`. For example:
 
 ```json
 {
@@ -42,19 +45,16 @@ may describe a fixed virtual gamepad in a small JSON file and set
 }
 ```
 
-The descriptor maps a known device identity to its fixed evdev controls. It
-does not choose a player. The host adapter does that through `RouterStore`, as
-R.O.B. Vision does for Buddy's Player 2 and VirtualGlove does for its gesture
-player. Signed pairing protocols and web pages stay in the host projects.
+The descriptor identifies controls; it does not create the device or select a player. A new project supplies its own receiver and game logic. The [Integration Guide](docs/INTEGRATION_GUIDE.md) explains that boundary and gives VirtualGlove and R.O.B. Vision examples. The current portal explicitly recognizes those two apps; a third app also needs portal registration and a display manifest.
 
-## Development and validation
+## Develop and validate
+
+Edit shared code here, then sync both product bundles:
 
 ```sh
 python3 -m unittest discover -s tests
 python3 scripts/sync.py --virtualglove /path/to/PowerGlove
-python3 scripts/sync.py --check --virtualglove /path/to/PowerGlove
+python3 scripts/sync.py --virtualglove /path/to/PowerGlove --check
 ```
 
-The library is vendored so each console installer contains a complete offline
-copy. Its `pyproject.toml` also permits packaging it independently for a future
-controller project.
+The library has no ROM or network dependency. Live console routing requires Linux uinput, udev, and RetroArch. See the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for product packaging and the [Technical Reference](docs/TECHNICAL_REFERENCE.md) for its security and runtime contracts.

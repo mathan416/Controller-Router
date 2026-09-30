@@ -11,6 +11,7 @@ VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consol
 - [Integration Guide](docs/INTEGRATION_GUIDE.md): add an unusual controller or game.
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
 - [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behavior.
+- [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md): changes in the first stable shared release.
 
 The controller's **Help** page offers shorter, task-based instructions and links to the printable PDFs in [output/pdf](output/pdf/). The [documentation library](docs/README.md) is the complete reading map.
 

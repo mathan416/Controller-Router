@@ -67,12 +67,12 @@ Both RetroArch 1.19.1 and the separate 1.20.0 build passed:
 5. Player 1 B and Player 2 A still reached the saved players.
 6. The merged output sysfs identities remained unchanged.
 7. Player 1's hotkey plus Start exited the session. Two presses were used because
-   RetroArch's test configuration retained its quit-confirmation behavior.
+   RetroArch's test configuration retained its quit-confirmation behaviour.
 
 These are Linux uinput disconnect/reconnect tests. They model a sleeping or
 waking wireless source; they are not a physical wireless-controller endurance
 test. Real controllers should still be checked for Bluetooth, receiver, and
-firmware-specific behavior.
+firmware-specific behaviour.
 
 ## Native reservation startup correction
 
@@ -150,7 +150,7 @@ not require a RetroArch upgrade.
 
 ## Per-system selection validation
 
-The shared scope tests verify selected system IDs, legacy NES/all behavior, two systems sharing one core, opt-out for NES, older-client assignment saves, revision-checked rollback, and blocking changes during an unmanaged game. Browser checks on both UNO Qs found no JavaScript errors or mobile horizontal overflow; NES opt-out switches to individual selection without saving automatically.
+The shared scope tests verify selected system IDs, legacy NES/all behaviour, two systems sharing one core, opt-out for NES, older-client assignment saves, revision-checked rollback, and blocking changes during an unmanaged game. Browser checks on both UNO Qs found no JavaScript errors or mobile horizontal overflow; NES opt-out switches to individual selection without saving automatically.
 
 On retropieconsole.local (RetroArch 1.19.1), NES/Gyruss, Genesis/Sonic, and PSP/Bust A Move Deluxe each completed 120-frame enabled and disabled boots. Enabled runs contained Router diagnostics; disabled runs added no Router routing configuration. The exact original Router document and previous-save document were restored. All saved RetroArch hashes and ownership matched, and merged output sysfs identities stayed unchanged. These bounded checks verify launch integration, not extended physical gameplay.
 

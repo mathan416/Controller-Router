@@ -4,6 +4,8 @@ Controller Router lets you choose which gamepad controls each player, and which 
 
 Already happy with your controls? Keep your saved choices. You only need this guide when you want to change a player, choose a system, or troubleshoot a pad.
 
+The screenshots use example devices and settings. Your console and gamepads may have different names.
+
 ## Open Setup
 
 1. In your browser, open the controller address shown by its installer.
@@ -11,6 +13,8 @@ Already happy with your controls? Keep your saved choices. You only need this gu
 3. Select your paired console under **Console connection**.
 
 You will see **Players** first, then **Systems**. Each console keeps its own settings. If no console appears, choose **Pair console** in Router Setup first.
+
+![The Apps page, with Players and Systems in the navigation](images/user-navigation.png)
 
 ## Choose who plays
 
@@ -26,6 +30,8 @@ Before assigning a gamepad, configure its buttons in EmulationStation, your cons
 Keep a physical gamepad assigned to **Player 1** for the usual menu and exit controls. Several pads can share one player; a pad can belong to only one player. Buddy stays on **Player 2** for Gyromite's red and blue gates.
 
 A game must support additional players for Player 3 or Player 4 to do anything. Assigning four pads does not turn a two-player game into a four-player game.
+
+![Players settings with example gamepads assigned to Player 1 and Player 2](images/user-players.png)
 
 ## Choose which systems use Router
 
@@ -47,6 +53,8 @@ New Router setups start with **NES only**. Upgrades keep your choices. **All Lib
 
 The list covers systems that offer supported RetroArch emulators. Separate emulators, such as a standalone Amiga emulator, keep their own controls. Your choice also stays saved if a system is temporarily unavailable.
 
+![Systems settings with NES using Controller Router and other systems using their existing setup](images/user-systems.png)
+
 ## Check a gamepad
 
 1. In Router Setup, choose **Test inputs**.
@@ -63,6 +71,8 @@ The list covers systems that offer supported RetroArch emulators. Separate emula
 
 **Reload** brings back the saved choices and discards unsaved edits. **Restore previous** restores the preceding saved setup. Exit the game before saving or restoring.
 
+![Test inputs button and its five-second prompt](images/user-test-inputs.png)
+
 ## Start a game or choose an app
 
 Launch a registered game on your paired console. Router selects VirtualGlove or R.O.B. Vision automatically, so you do not need a browser open for the controller to join the game. Only that app supplies game input and display cues. When the game ends, the Matrix returns to its neutral animation.
@@ -70,6 +80,8 @@ Launch a registered game on your paired console. Router selects VirtualGlove or 
 To open an app yourself, visit the controller address. With one app installed, it opens directly. With both installed, choose VirtualGlove or R.O.B. Vision. **Apps** in either app returns to the chooser; it appears only when both are installed. Finish a game before changing apps manually. Both apps stay available in the background.
 
 After the startup heart, an animated hourglass shows that the controller is still starting. When the installed controller apps are ready, the Matrix shows Router’s neutral animation. After a reboot, the controller waits for a game or your choice. You do not need to reinstall or pair again.
+
+![Apps page showing VirtualGlove and R.O.B. Vision as available choices](images/user-apps.png)
 
 ## Get back to your game
 
@@ -85,25 +97,4 @@ After the startup heart, an animated hourglass shows that the controller is stil
 
 ## More help
 
-For installation and pairing, use your controller app’s guide. To build a controller integration, start with the [Integration Guide](INTEGRATION_GUIDE.md). API and recovery details are in the [Technical Reference](TECHNICAL_REFERENCE.md).
-
-## Pair your console once
-
-Pair your console once through Controller Router. VirtualGlove and R.O.B. Vision receive their own private credentials automatically when installed on both devices. Installing the other app later adds its access without another pairing. No SSH username or password is required.
-
-Finish the game before pairing, changing app access, or removing a connection. Each console connects to one Controller Router installation at a time. Connecting it to another requires a new console code and Matrix confirmation.
-
-1. Open **Apps > Setup > Pair console**. Both product Setup pages have an **Open Pair console** link to this same page.
-2. Open the secure address printed by the controller installer, using its `.local` name or LAN IP. Pairing uses HTTPS port **8444**.
-3. Before accepting the local certificate, compare the browser's SHA-256 fingerprint with the fingerprint printed by the controller installer. During confirmation, its beginning also appears after **ID** on the Matrix. Stop if they differ.
-4. Enter the console hostname or IP address and paste its complete **CR1 connection code**. The console installer prints this single-use code; it lasts five minutes.
-5. Choose **Continue**, read the six Matrix digits after **PN**, and enter them within two minutes.
-6. Choose **Connect**. Wait for **Connected** and check each app's readiness below it.
-
-### Check or repair a connection
-
-Open **Pair console > Your consoles**. **Connected** means Router has verified the console connection. **Unavailable** means it could not reach the console. **Needs attention** means the certificate, identity, or app setup needs review. App readiness is shown separately.
-
-Choose **Check and repair connections** after reconnecting a device or installing another app. Use **Disable** beside an app to remove only its access, or **Remove console** to remove the whole connection. Finish any game first. A certificate change requires a fresh pairing; do not ignore the mismatch.
-
-For another code, rerun the console installer or its pairing command. Existing game filenames and player assignments remain saved. Incorrect, expired, or already-used codes require a new window; five incorrect Matrix confirmations lock the current window.
+For installation and connection steps, see the [Pairing Guide](PAIRING_GUIDE.md). To build a controller integration, start with the [Integration Guide](INTEGRATION_GUIDE.md). API and recovery details are in the [Technical Reference](TECHNICAL_REFERENCE.md).

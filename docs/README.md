@@ -1,5 +1,7 @@
 # Controller Router guides
 
+Use Canadian English in project-authored documentation, Help, website copy, and release notes (for example, **behaviour**, **colour**, **centre**, and **recognise**). Preserve exact commands, code identifiers, legal text, and third-party names.
+
 - [User Guide](USER_GUIDE.md): choose players and systems, test a pad, and recover a game.
 - [Pairing Guide](PAIRING_GUIDE.md): connect a console once, check app readiness, and manage access.
 - [Integration Guide](INTEGRATION_GUIDE.md): build a unique controller integration, choose an input boundary, and use assignment APIs.
@@ -14,7 +16,7 @@ Printable editions are in [output/pdf](../output/pdf/). Rebuild with `python3 sc
 
 ## Documentation for players and developers
 
-Write each guide for one reader and one purpose. Player Help answers “what do I do next?”; technical references define interfaces and failure behavior; engineering reports preserve dated evidence.
+Write each guide for one reader and one purpose. Player Help answers “what do I do next?”; technical references define interfaces and failure behaviour; engineering reports preserve dated evidence.
 
 ### Player guides
 
@@ -28,9 +30,9 @@ Write each guide for one reader and one purpose. Player Help answers “what do 
 ### Technical guides
 
 - Provide a reading map and define component ownership before describing the data flow.
-- State API inputs, outputs, validation, defaults, bounds, error behavior, authentication, and cleanup. Show runnable minimal examples and identify placeholders.
-- Separate persistent configuration from generated state, installation changes from runtime behavior, and local APIs from network transports.
-- Document version detection and fallback behavior without treating a build as a live hardware result.
+- State API inputs, outputs, validation, defaults, bounds, error behaviour, authentication, and cleanup. Show runnable minimal examples and identify placeholders.
+- Separate persistent configuration from generated state, installation changes from runtime behaviour, and local APIs from network transports.
+- Document version detection and fallback behaviour without treating a build as a live hardware result.
 - Link source modules and evidence. Historical results keep their date; a current reference describes the current implementation.
 - Check instructions against the app, links against their targets, and PDFs against their rendered pages before publishing.
 

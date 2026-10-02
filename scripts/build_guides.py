@@ -28,6 +28,7 @@ def inline(s):
     s=re.sub(r'`([^`]+)`',r'<font face="Courier">\1</font>',s)
     s=re.sub(r'\*\*([^*]+)\*\*',r'<b>\1</b>',s)
     s=re.sub(r'\[([^]]+)\]\((https?://[^)]+)\)', r'<link href="\2" color="#168e9a">\1</link>', s)
+    s=re.sub(r'\[([^]]+)\]\((?!https?://)[^)]+\)', r'\1', s)
     return s
 
 def architecture():

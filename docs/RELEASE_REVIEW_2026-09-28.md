@@ -6,7 +6,7 @@ This review covers the development checkout, including shared Router code and UN
 
 ## Code and integration reviewed
 
-- Identity-based session routing, enabled-system policy, physical reconnect behavior, temporary RetroArch settings, configuration precedence, owned-profile repair, and installer-only migration.
+- Identity-based session routing, enabled-system policy, physical reconnect behaviour, temporary RetroArch settings, configuration precedence, owned-profile repair, and installer-only migration.
 - Shared app selection, authenticated session ownership, fail-closed leases, Matrix manifests and expiry, chooser assets, same-origin requests, service startup, and failed-upgrade recovery.
 - Product installers, preserved pairing and registries, console transport, game/frame integration, and product-specific input boundaries.
 
@@ -39,7 +39,7 @@ VirtualGlove’s former manual software-recovery limitation is corrected in its 
 
 Reviewed the maintained guide collections across VirtualGlove, R.O.B. Vision, and Controller Router by audience. Player Help now uses named controls, numbered tasks, expected results, and symptom-based recovery. Technical references retain platform diagnostics, configuration ownership, protocol boundaries, validation, and source links. Historical experiment reports remain engineering evidence rather than present-day setup instructions.
 
-Checked player assignments, system selection, save/restore revision behavior, input checks, launch routing, and app selection against Router's shared code and Setup controls. Checked Buddy's levels, gyro handling, gate assistance, Stack-Up clearance rules, and Test cues against its controller and dashboard. Checked VirtualGlove's game profiles, native hand-input boundary, camera checks, pairing, and Matrix instructions against its application and installer code. Documentation does not claim a new live gameplay validation from this editorial review.
+Checked player assignments, system selection, save/restore revision behaviour, input checks, launch routing, and app selection against Router's shared code and Setup controls. Checked Buddy's levels, gyro handling, gate assistance, Stack-Up clearance rules, and Test cues against its controller and dashboard. Checked VirtualGlove's game profiles, native hand-input boundary, camera checks, pairing, and Matrix instructions against its application and installer code. Documentation does not claim a new live gameplay validation from this editorial review.
 
 Verification: all three guide collections have no unresolved local Markdown links or heading targets; VirtualGlove's documentation audit and four Help rendering tests pass. Rebuilt 33 maintained PDF editions, rendered all pages for visual inspection, and inspected key revised player pages at reading resolution. Preserved the separate engineering journey and technical test results.
 

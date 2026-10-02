@@ -10,7 +10,7 @@ VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consol
 - [Pairing Guide](docs/PAIRING_GUIDE.md): connect a console once and check each app's access.
 - [Integration Guide](docs/INTEGRATION_GUIDE.md): add an unusual controller or game.
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
-- [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behavior.
+- [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behaviour.
 - [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md): changes in the first stable shared release.
 
 The controller's **Help** page offers shorter, task-based instructions and links to the printable PDFs in [output/pdf](output/pdf/). The [documentation library](docs/README.md) is the complete reading map.
@@ -46,7 +46,7 @@ The dependency-free `router_shared` package exposes player assignment and input-
 }
 ```
 
-The descriptor identifies controls; it does not create the device or select a player. A new project supplies its own receiver and game logic. The [Integration Guide](docs/INTEGRATION_GUIDE.md) explains that boundary and gives VirtualGlove and R.O.B. Vision examples. The current portal explicitly recognizes those two apps; a third app also needs portal registration and a display manifest.
+The descriptor identifies controls; it does not create the device or select a player. A new project supplies its own receiver and game logic. The [Integration Guide](docs/INTEGRATION_GUIDE.md) explains that boundary and gives VirtualGlove and R.O.B. Vision examples. The current portal explicitly recognises those two apps; a third app also needs portal registration and a display manifest.
 
 ## Develop and validate
 

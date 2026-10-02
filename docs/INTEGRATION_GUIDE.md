@@ -13,18 +13,18 @@ The optional UNO Q runtime adds shared app selection, an input lease, and a 13 b
 | Gesture state similar to VirtualGlove | Use the existing local datagram contract, reviewing its game/core gating |
 | Native game-specific data outside RetroPad | Keep that transport in your project; use Router for companion physical pads |
 
-For a new controller, a fixed uinput device and source descriptor provide the clearest starting point. The datagram path currently carries VirtualGlove-shaped state and enables virtual input for recognized joystick cores. It is not an unrestricted controller protocol for every game.
+For a new controller, a fixed uinput device and source descriptor provide the clearest starting point. The datagram path currently carries VirtualGlove-shaped state and enables virtual input for recognised joystick cores. It is not an unrestricted controller protocol for every game.
 
 ## Define the project boundary
 
-1. Choose the game and required controls: buttons, directions, analog values, or native data.
+1. Choose the game and required controls: buttons, directions, analogue values, or native data.
 2. Implement the sensor or device reader in your project.
 3. Translate its readings into the game's controls in your adapter.
 4. On the console, create a stable uinput gamepad identity or an explicit native transport.
 5. Give Router the input mappings and chosen player assignment.
 6. Authenticate remote commands and release held controls if communication stops.
 7. Add a setup interface that calls Router's assignment API.
-8. Test the game's actual input, exit behavior, and disconnect recovery.
+8. Test the game's actual input, exit behaviour, and disconnect recovery.
 
 Router does not detect ROMs, know game rules, interpret a sensor, define your product-specific game credentials, or provide a generic game plugin loader. Those responsibilities stay with the host project.
 
@@ -115,7 +115,7 @@ Keep merged outputs alive while physical pads sleep, wake, or reconnect. The sha
 
 Save system policy with player assignments through the same revision-checked configuration API. `physical_scope` accepts `nes`, `all`, or `systems`; selected mode uses `physical_systems` for canonical system IDs. Preserve the current policy when an older client updates only player assignments.
 
-A disabled system keeps its original launch arguments and receives no Router routing overrides or physical-source forwarding. Keep merged outputs connected. The [Technical Reference](TECHNICAL_REFERENCE.md) defines validation and launch behavior; the [User Guide](USER_GUIDE.md) provides the player-facing Setup instructions.
+A disabled system keeps its original launch arguments and receives no Router routing overrides or physical-source forwarding. Keep merged outputs connected. The [Technical Reference](TECHNICAL_REFERENCE.md) defines validation and launch behaviour; the [User Guide](USER_GUIDE.md) provides the player-facing Setup instructions.
 
 ## Use the shared connection authority
 

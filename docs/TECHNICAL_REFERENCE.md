@@ -10,7 +10,7 @@ Controller Router contains two related systems: a console input-routing library 
 | Build an assignment editor | [Assignment API](#assignment-api-a-new-project) |
 | Route a game launch | [RetroArch compatibility](#retroarch-compatibility-and-launch-routing) and [system policy](#per-system-routing-policy) |
 | Add a UNO Q app | [Input leases](#game-selection-and-input-leases) and [Matrix protocol](#matrix-manifests-and-request-protocol) |
-| Investigate a failure | [Display failure behavior](#display-timing-and-failure-behavior) and [validation limits](#verification-and-known-limitations) |
+| Investigate a failure | [Display failure behaviour](#display-timing-and-failure-behaviour) and [validation limits](#verification-and-known-limitations) |
 
 **Terms:** a *source* is a physical or receiver-created input device; an *output* is a merged player device presented to RetroArch. A *session* is one running game. An input *lease* permits one UNO Q product to send input for a bounded time. Selecting a UNO Q product does not change console player assignments.
 
@@ -67,7 +67,7 @@ Pairing protocols, ROM registries, and game-specific actions belong to the produ
 
 The socket is `/run/user/1000/controller-router-portal/control.sock`. The port-80 web container forwards fixed requests through a private Compose bridge; it has no general shell-command API. Containers run as UID 1000 with read-only filesystems, dropped capabilities, and no new privileges.
 
-The chooser exposes `GET /api/state` and `POST /api/select`. Selection requires JSON, a bounded request body, and a recognized app. Cross-site browser requests are rejected; same-host product origins on ports 8100 and 8101 are permitted for direct-visit selection. LAN browser selection has no user token and relies on the trusted-network deployment model. Console authentication remains in the products.
+The chooser exposes `GET /api/state` and `POST /api/select`. Selection requires JSON, a bounded request body, and a recognised app. Cross-site browser requests are rejected; same-host product origins on ports 8100 and 8101 are permitted for direct-visit selection. LAN browser selection has no user token and relies on the trusted-network deployment model. Console authentication remains in the products.
 
 A single installed product is selected and opened by the entry page. With two, the chooser stays visible until a choice. With no products, it cannot redirect to a controller. Neither chooser path starts or stops product services.
 
@@ -91,7 +91,7 @@ Each product data directory contains `controller-router-lease.json` and the `con
 
 Managed products reject missing, malformed, revoked, expired, and previous-boot leases. Their receivers must release input when the product stops supplying it. Product watchdogs complete this boundary; reading an active lease alone is not enough to implement a new receiver safely.
 
-R.O.B. Vision retains pending frame actions for up to 12 seconds while waiting for ownership and retries delivery approximately every 200 ms. It rejects stale or mismatched game/process actions. That queue is product behavior, not part of the generic Router API.
+R.O.B. Vision retains pending frame actions for up to 12 seconds while waiting for ownership and retries delivery approximately every 200 ms. It rejects stale or mismatched game/process actions. That queue is product behaviour, not part of the generic Router API.
 
 <!-- pagebreak -->
 
@@ -110,7 +110,7 @@ Apps are identified as `virtualglove` and `rob_vision`. Their animation manifest
 | Frames per animation | 1 to 128 |
 | Frame duration `ms` | Integer, 50 to 5000 |
 | Frame rows | Eight strings, each 13 characters long |
-| Pixel values | Characters `0` through `7`; eight grayscale levels |
+| Pixel values | Characters `0` through `7`; eight greyscale levels |
 | Manifest file | At most 1 MB; symlinks rejected |
 
 Example of a complete single-frame manifest:
@@ -154,9 +154,9 @@ A product should use `display(app, action, **details)` rather than inventing its
 
 <!-- pagebreak -->
 
-## Display timing and failure behavior
+## Display timing and failure behaviour
 
-| Action | Behavior |
+| Action | Behaviour |
 | --- | --- |
 | `play` | Play a manifest animation; identical refreshes keep its position |
 | `status` | Show one to three supported characters |
@@ -259,7 +259,7 @@ For a fixed virtual gamepad, `configured_sources(path)` validates a schema-1 sou
 
 For the existing gesture socket, the engine uses local Unix datagrams, not an authenticated network endpoint. `virtual_state()` accepts boolean D-pad values, boolean buttons `a`, `b`, `start`, `select`, `glove_zap`, and integer axes `x`, `y`, `z`, `roll` in -32767 through 32767. Datagram payloads are bounded to 8192 bytes. Virtual state has a 500 ms stale timeout.
 
-The `virtualglove_player` configuration field chooses the gesture stream's player. Delivery is additionally gated by recognized joystick cores in the current engine. Native hand data takes a separate product path. To support arbitrary new game/core combinations, review and extend this gating with tests, or use the fixed uinput source path instead.
+The `virtualglove_player` configuration field chooses the gesture stream's player. Delivery is additionally gated by recognised joystick cores in the current engine. Native hand data takes a separate product path. To support arbitrary new game/core combinations, review and extend this gating with tests, or use the fixed uinput source path instead.
 
 Sources: [input engine](https://github.com/mathan416/Controller-Router/blob/dev/router_shared/controller_router.py), [source descriptor validation](https://github.com/mathan416/Controller-Router/blob/dev/router_shared/virtual_sources.py), and [gesture state contract](https://github.com/mathan416/Controller-Router/blob/dev/router_shared/merged_gamepad.py).
 
@@ -335,13 +335,13 @@ Run the shared repository tests:
 python3 -m unittest discover -s tests
 ```
 
-The suites exercise library storage and mappings, portal selection and browser protections, leases, shared display validation and scheduling, and installer behavior. Mocked tests verify contracts; live tests verify the device and emulator boundary.
+The suites exercise library storage and mappings, portal selection and browser protections, leases, shared display validation and scheduling, and installer behaviour. Mocked tests verify contracts; live tests verify the device and emulator boundary.
 
-For a release candidate, record both install orders, repeat upgrades, one-app redirects, two-app chooser behavior, no-selection reboot, automatic game selection, first input, exit, manual-switch rejection, service loss, display expiry, and pairing. Verify preserved registry and assignment data and RetroPie ownership. Test each product's supported consoles and emulator cores separately.
+For a release candidate, record both install orders, repeat upgrades, one-app redirects, two-app chooser behaviour, no-selection reboot, automatic game selection, first input, exit, manual-switch rejection, service loss, display expiry, and pairing. Verify preserved registry and assignment data and RetroPie ownership. Test each product's supported consoles and emulator cores separately.
 
 The live uinput reconnect regression passed on RetroArch 1.19.1 and the separate 1.20.0 test build. Physical wireless-controller endurance testing remains a release check. Keep merged outputs alive throughout a game; if the Router process loses them, report the failure and require relaunch. See `docs/ROUTING_VALIDATION.md` for the evidence and its limits.
 
-One selected app owns a UNO Q game at a time. The current system does not combine VirtualGlove's gestures and Buddy's game input simultaneously. Console merging within the selected product and physical sources remains available. Pairing and platform-specific support are controlled by the products, not extended merely because this library recognizes a platform.
+One selected app owns a UNO Q game at a time. The current system does not combine VirtualGlove's gestures and Buddy's game input simultaneously. Console merging within the selected product and physical sources remains available. Pairing and platform-specific support are controlled by the products, not extended merely because this library recognises a platform.
 
 
 ## RetroArch compatibility and launch routing
@@ -377,11 +377,11 @@ Live evidence is recorded in `docs/ROUTING_VALIDATION.md`. Legacy validation tar
 
 ## Per-system routing policy
 
-The format-2 document accepts `physical_scope` values `nes`, `all`, and `systems`. Selected mode stores canonical console IDs in `physical_systems`; an empty list disables routing for every system. Existing documents without a scope retain their released all-system behavior. New configurations start with NES only. Assignment-only saves from older clients preserve the current policy.
+The format-2 document accepts `physical_scope` values `nes`, `all`, and `systems`. Selected mode stores canonical console IDs in `physical_systems`; an empty list disables routing for every system. Existing documents without a scope retain their released all-system behaviour. New configurations start with NES only. Assignment-only saves from older clients preserve the current policy.
 
 The read API includes a `systems` catalogue with ID, display name, and enabled state. System selections use the existing revision-checked save and rollback operations. Discover newly installed systems without enabling them in selected mode.
 
-RetroPie emulator registrations and Batocera configgen pass `--system` to the Router adapter. The adapter supplies `CONTROLLER_ROUTER_SYSTEM` to the RetroArch process; the input service reads that same identity from its process environment. Core names do not distinguish systems sharing an emulator. A compatibility fallback reads the RetroPie system configuration path, or recognizes known NES cores for older NES-only launches. Selected mode with no known system passes through without routing.
+RetroPie emulator registrations and Batocera configgen pass `--system` to the Router adapter. The adapter supplies `CONTROLLER_ROUTER_SYSTEM` to the RetroArch process; the input service reads that same identity from its process environment. Core names do not distinguish systems sharing an emulator. A compatibility fallback reads the RetroPie system configuration path, or recognises known NES cores for older NES-only launches. Selected mode with no known system passes through without routing.
 
 Disabled launches preserve the original frontend arguments and add no Router settings. The input service leaves physical sources ungrabbed and does not forward them for that session. Merged output devices remain alive. Global, system, and override RetroArch configurations remain untouched.
 
@@ -389,7 +389,7 @@ Disabled launches preserve the original frontend arguments and add no Router set
 
 Router appends its temporary settings after existing appended files. RetroArch can still load a core or game override afterward. A user override containing joypad indexes or reservations can therefore replace the session routing. Preserve unrelated game overrides; inspect controller-specific overrides when a game selects the wrong merged player despite correct launch diagnostics.
 
-During RetroPie installation or upgrade, Router backs up the FCEUmm and Nestopia core overrides and removes only `input_player1_joypad_index` through `input_player4_joypad_index` inside one recognized old Router block. Button bindings, hotkeys, unmarked indexes, and other settings remain. This migration is installer-only. Router never changes these files at receiver startup or game launch, and RetroPie configuration and profile files remain owned by `pi:pi`.
+During RetroPie installation or upgrade, Router backs up the FCEUmm and Nestopia core overrides and removes only `input_player1_joypad_index` through `input_player4_joypad_index` inside one recognised old Router block. Button bindings, hotkeys, unmarked indexes, and other settings remain. This migration is installer-only. Router never changes these files at receiver startup or game launch, and RetroPie configuration and profile files remain owned by `pi:pi`.
 
 ## Shared device pairing
 

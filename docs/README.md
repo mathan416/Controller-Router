@@ -43,3 +43,7 @@ Write each guide for one reader and one purpose. Player Help answers “what do 
 - [Diátaxis: tutorials, how-to, reference, and explanation](https://diataxis.fr/start-here/).
 - [Xbox Accessibility Guideline 106: player-facing information](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/106).
 - [Google: API reference](https://developers.google.com/style/api-reference-comments).
+
+## Next release
+
+[0.3.0 release preparation](RELEASE_NOTES_0.3.0.md) records the changes, independent UNO Q runtime version, and candidate acceptance still required. The published 0.2.0 notes remain historical release documentation.

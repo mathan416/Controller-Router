@@ -485,6 +485,31 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
+    def test_previous_stable_product_cannot_replace_prepared_runtime(self):
+        current = (portal_install.SOURCE / 'VERSION').read_text()
+        self.assertGreater(tuple(map(int, current.strip().split('.'))), (0, 3, 1))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, installed = root / 'old-product', root / 'installed'
+            source.mkdir()
+            installed.mkdir()
+            (source / 'VERSION').write_text('0.3.1\n')
+            (installed / 'VERSION').write_text(current)
+            sentinel = installed / 'preserved-runtime'
+            sentinel.write_text('new recovery implementation')
+            with patch.object(portal_install, 'SOURCE', source), \
+                 patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install, 'LEGACY', root / 'legacy'), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'command') as command, \
+                 patch.object(portal_install, 'validate_package') as validate:
+                self.assertIn('newer', portal_install.install())
+                validate.assert_not_called()
+                self.assertEqual(command.call_args_list[0][0],
+                                 ('python3', str(installed / 'host/products.py'), 'start-all'))
+            self.assertEqual(sentinel.read_text(), 'new recovery implementation')
+            self.assertEqual((installed / 'VERSION').read_text(), current)
+
     def test_incomplete_bundle_fails_before_changing_services(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

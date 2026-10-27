@@ -12,7 +12,7 @@ Controller Router contains two related systems: a console input-routing library 
 | Add a UNO Q app | [Input leases](#game-selection-and-input-leases) and [Matrix protocol](#matrix-manifests-and-request-protocol) |
 | Investigate a failure | [Display failure behaviour](#display-timing-and-failure-behaviour) and [validation limits](#verification-and-known-limitations) |
 
-**Terms:** a *source* is a physical or receiver-created input device; an *output* is a merged player device presented to RetroArch. A *session* is one running game. An input *lease* permits one UNO Q product to send input for a bounded time. Selecting a UNO Q product does not change console player assignments.
+**Terms:** a *source* is a physical or receiver-created input device; an *output* is a merged player device presented to RetroArch or a registered native emulator. A *session* is one running game. An input *lease* permits one UNO Q product to send input for a bounded time. Selecting a UNO Q product does not change console player assignments.
 
 
 ## Architecture and responsibilities
@@ -30,7 +30,7 @@ flowchart TB
   Product --> Receiver[Console receiver]
   Pads[Physical gamepads] --> Merge[Console Router merged players]
   Receiver --> Merge
-  Merge --> Core[RetroArch and libretro]
+  Merge --> Core[RetroArch and registered native emulators]
 ```
 
 The diagram's session reports are the products' existing authenticated console notifications and heartbeats. Router reads the resulting local service state; the chooser does not infer game selection from which browser tab is open.
@@ -70,6 +70,8 @@ The socket is `/run/user/1000/controller-router-portal/control.sock`. The port-8
 The chooser exposes `GET /api/state` and `POST /api/select`. Selection requires JSON, a bounded request body, and a recognised app. Cross-site browser requests are rejected; same-host product origins on ports 8100 and 8101 are permitted for direct-visit selection. LAN browser selection has no user token and relies on the trusted-network deployment model. Console authentication remains in the products.
 
 A single installed product is selected and opened by the entry page. With two, the chooser stays visible until a choice. With no products, it cannot redirect to a controller. Neither chooser path starts or stops product services.
+
+The broker checks the local entry API every 15 seconds in a background thread. A healthy response must be HTTP 200 with a JSON object containing `apps` and `matrix`. If unavailable, it runs `docker compose up -d` for the entry project only, with a 90-second command timeout, then makes up to ten readiness probes with two-second HTTP timeouts and one-second pauses. Failed attempts are retried; identical consecutive errors are logged once until recovery. It does not force-recreate a healthy entry page, restart Docker, or restart product services. A port conflict remains a reported failure until the conflicting listener is resolved.
 
 <!-- pagebreak -->
 

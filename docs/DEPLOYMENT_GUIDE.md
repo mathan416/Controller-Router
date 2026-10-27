@@ -115,6 +115,10 @@ To add your app:
 
 Keep Router as the sole Matrix firmware owner. Product installation and startup should not flash a competing sketch. The shared Matrix's first App Lab build can take several minutes; keep progress visible and explain the wait to users.
 
+### Entry-page startup recovery
+
+The broker monitors `http://127.0.0.1/api/state` in a background thread. When the entry API is unavailable, it starts only the `uno-controller-router-entry` Compose project and checks readiness before reporting success. It retries after failure, suppresses repeated identical error messages, and reports Docker port conflicts. Healthy entry containers are left running. Recovery does not restart Docker or product services, change selection, or rewrite console settings. An unrelated listener occupying port 80 requires operator intervention; the broker does not stop it.
+
 ## Shared device pairing
 
 ### Services and credentials

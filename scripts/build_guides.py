@@ -50,7 +50,7 @@ def architecture():
     box(185,75,WIDTH-185,45,'Selected product and receiver','One renewable input lease')
     arrow(185,167,77,120);arrow(335,145,335,120)
     box(0,5,155,45,'Physical gamepads','EmulationStation mappings')
-    box(185,5,WIDTH-185,45,'Console Router outputs','Merged players to RetroArch / libretro')
+    box(185,5,WIDTH-185,45,'Console Router outputs','RetroArch and registered native emulators')
     arrow(335,75,335,50);arrow(155,27,185,27)
     return d
 

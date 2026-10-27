@@ -51,7 +51,7 @@ Want Router for NES but your normal controls for Mega Drive / Genesis? You can c
 
 New Router setups start with **NES only**. Upgrades keep your choices. **All supported systems, including newly added systems** applies Router to supported RetroArch systems and explicitly registered native host adapters. In individual mode, a newly discovered system starts with **My existing setup**.
 
-The list covers systems that offer supported RetroArch emulators. Separate emulators, such as a standalone Amiga emulator, keep their own controls. Your choice also stays saved if a system is temporarily unavailable.
+The list covers systems with supported RetroArch emulators or explicitly registered native host adapters. Other emulators keep their own controls. Your choice also stays saved if a system is temporarily unavailable.
 
 ![Systems settings with NES using Controller Router and other systems using their existing setup](images/user-systems.png)
 

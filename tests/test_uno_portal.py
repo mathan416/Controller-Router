@@ -17,6 +17,97 @@ from uno_portal.host import products
 
 
 class PortTests(unittest.TestCase):
+    def test_entry_start_waits_for_router_api_without_recreating_a_healthy_page(self):
+        with tempfile.TemporaryDirectory() as directory:
+            portal = Path(directory)
+            compose = portal / 'host/portal-compose.yaml'
+            compose.parent.mkdir()
+            compose.write_text('services: {}\n')
+            with patch.object(broker, 'PORTAL', portal), \
+                 patch.object(broker, 'portal_ready', side_effect=[False, False, True]), \
+                 patch.object(broker.subprocess, 'run') as run, \
+                 patch.object(broker.time, 'sleep') as pause:
+                broker.ensure_portal()
+            run.assert_called_once()
+            command = run.call_args[0][0]
+            self.assertEqual(command[-2:], ['up', '-d'])
+            self.assertNotIn('--force-recreate', command)
+            pause.assert_called_once_with(1)
+            with patch.object(broker, 'portal_ready', return_value=True), \
+                 patch.object(broker.subprocess, 'run') as run:
+                broker.ensure_portal()
+            run.assert_not_called()
+
+    def test_entry_start_reports_a_docker_port_conflict(self):
+        with tempfile.TemporaryDirectory() as directory:
+            portal = Path(directory)
+            compose = portal / 'host/portal-compose.yaml'
+            compose.parent.mkdir()
+            compose.write_text('services: {}\n')
+            conflict = subprocess.CalledProcessError(1, ['docker', 'compose'],
+                                                     stderr='Bind for 0.0.0.0:80 failed: port is already allocated\n')
+            with patch.object(broker, 'PORTAL', portal), \
+                 patch.object(broker, 'portal_ready', return_value=False), \
+                 patch.object(broker.subprocess, 'run', side_effect=conflict):
+                with self.assertRaisesRegex(RuntimeError, 'port is already allocated'):
+                    broker.ensure_portal()
+
+    def test_entry_watchdog_retries_after_a_failed_start(self):
+        with patch.object(broker, 'ensure_portal', side_effect=[RuntimeError('port busy'), None]) as ensure, \
+             patch.object(broker.time, 'sleep', side_effect=[None, StopIteration]) as pause, \
+             patch('builtins.print') as report:
+            with self.assertRaises(StopIteration):
+                broker.start_portal()
+        self.assertEqual(ensure.call_count, 2)
+        self.assertEqual(pause.call_count, 2)
+        report.assert_called_once_with('Controller Router entry unavailable: port busy', flush=True)
+
+    def test_entry_health_requires_the_router_api(self):
+        from io import BytesIO
+        from urllib.error import URLError
+        for payload, status, expected in [
+            (b'{"apps": {}, "matrix": {}}', 200, True),
+            (b'{"apps": {}}', 200, False),
+            (b'[]', 200, False),
+            (b'not json', 200, False),
+            (b'{"apps": {}, "matrix": {}}', 503, False),
+        ]:
+            with self.subTest(payload=payload, status=status):
+                response = BytesIO(payload)
+                response.status = status
+                with patch.object(broker, 'urlopen', return_value=response) as request:
+                    self.assertEqual(broker.portal_ready(), expected)
+                request.assert_called_once_with('http://127.0.0.1/api/state', timeout=2)
+        with patch.object(broker, 'urlopen', side_effect=URLError('offline')):
+            self.assertFalse(broker.portal_ready())
+
+    def test_entry_start_has_a_bounded_readiness_wait(self):
+        with tempfile.TemporaryDirectory() as directory:
+            portal = Path(directory)
+            compose = portal / 'host/portal-compose.yaml'
+            compose.parent.mkdir()
+            compose.write_text('services: {}\n')
+            with patch.object(broker, 'PORTAL', portal), \
+                 patch.object(broker, 'portal_ready', return_value=False) as ready, \
+                 patch.object(broker.subprocess, 'run') as run, \
+                 patch.object(broker.time, 'sleep') as pause:
+                with self.assertRaisesRegex(RuntimeError, 'port 80 did not respond'):
+                    broker.ensure_portal()
+            self.assertEqual(ready.call_count, 11)
+            self.assertEqual(pause.call_count, 10)
+            run.assert_called_once_with(
+                ['docker', 'compose', '-p', broker.ENTRY_PROJECT, '-f', str(compose), 'up', '-d'],
+                check=True, capture_output=True, text=True, timeout=90)
+
+    def test_entry_watchdog_deduplicates_errors_and_recovers(self):
+        failures = [OSError('offline'), OSError('offline'), None, OSError('offline')]
+        with patch.object(broker, 'ensure_portal', side_effect=failures), \
+             patch.object(broker.time, 'sleep', side_effect=[None, None, None, StopIteration]), \
+             patch('builtins.print') as report:
+            with self.assertRaises(StopIteration):
+                broker.start_portal()
+        self.assertEqual(report.call_count, 2)
+
     def test_legacy_boot_cleanup_is_narrow_and_repeatable(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)

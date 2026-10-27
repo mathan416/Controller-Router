@@ -1,4 +1,5 @@
 import tempfile
+from contextlib import contextmanager
 import threading
 import unittest
 import subprocess
@@ -16,6 +17,15 @@ from uno_portal import install as portal_install
 from uno_portal.host import products
 
 
+@contextmanager
+def isolated_sleep(module, **kwargs):
+    # Replace this module's clock, not the shared time.sleep used by live
+    # Matrix/lease threads created by the imported broker.
+    with patch.object(module, 'time') as clock:
+        clock.sleep.configure_mock(**kwargs)
+        yield clock.sleep
+
+
 class PortTests(unittest.TestCase):
     def test_entry_start_waits_for_router_api_without_recreating_a_healthy_page(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -26,7 +36,7 @@ class PortTests(unittest.TestCase):
             with patch.object(broker, 'PORTAL', portal), \
                  patch.object(broker, 'portal_ready', side_effect=[False, False, True]), \
                  patch.object(broker.subprocess, 'run') as run, \
-                 patch.object(broker.time, 'sleep') as pause:
+                 isolated_sleep(broker) as pause:
                 broker.ensure_portal()
             run.assert_called_once()
             command = run.call_args[0][0]
@@ -54,7 +64,7 @@ class PortTests(unittest.TestCase):
 
     def test_entry_watchdog_retries_after_a_failed_start(self):
         with patch.object(broker, 'ensure_portal', side_effect=[RuntimeError('port busy'), None]) as ensure, \
-             patch.object(broker.time, 'sleep', side_effect=[None, StopIteration]) as pause, \
+             isolated_sleep(broker, side_effect=[None, StopIteration]) as pause, \
              patch('builtins.print') as report:
             with self.assertRaises(StopIteration):
                 broker.start_portal()
@@ -90,7 +100,7 @@ class PortTests(unittest.TestCase):
             with patch.object(broker, 'PORTAL', portal), \
                  patch.object(broker, 'portal_ready', return_value=False) as ready, \
                  patch.object(broker.subprocess, 'run') as run, \
-                 patch.object(broker.time, 'sleep') as pause:
+                 isolated_sleep(broker) as pause:
                 with self.assertRaisesRegex(RuntimeError, 'port 80 did not respond'):
                     broker.ensure_portal()
             self.assertEqual(ready.call_count, 11)
@@ -102,7 +112,7 @@ class PortTests(unittest.TestCase):
     def test_entry_watchdog_deduplicates_errors_and_recovers(self):
         failures = [OSError('offline'), OSError('offline'), None, OSError('offline')]
         with patch.object(broker, 'ensure_portal', side_effect=failures), \
-             patch.object(broker.time, 'sleep', side_effect=[None, None, None, StopIteration]), \
+             isolated_sleep(broker, side_effect=[None, None, None, StopIteration]), \
              patch('builtins.print') as report:
             with self.assertRaises(StopIteration):
                 broker.start_portal()
@@ -136,14 +146,14 @@ class PortTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.status = 200
         with patch.object(portal_install, 'urlopen', side_effect=[OSError('starting'), response]) as open_url, \
-             patch.object(portal_install.time, 'sleep') as pause:
+             isolated_sleep(portal_install) as pause:
             portal_install.wait_secure_setup()
         self.assertEqual(open_url.call_count, 2)
         pause.assert_called_once_with(1)
 
     def test_secure_setup_readiness_has_a_deadline(self):
         with patch.object(portal_install, 'urlopen', side_effect=OSError('unavailable')) as open_url, \
-             patch.object(portal_install.time, 'sleep'):
+             isolated_sleep(portal_install):
             with self.assertRaisesRegex(RuntimeError, 'secure Setup'):
                 portal_install.wait_secure_setup()
         self.assertEqual(open_url.call_count, 30)

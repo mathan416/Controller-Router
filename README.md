@@ -64,6 +64,6 @@ Native RetroPie host adapters and nested ports are included in the shared source
 
 ## Continuous integration
 
-Pushes to `dev`/`main` and pull requests run the complete Router and UNO Q portal suite on Python 3.7, 3.10 and 3.12. The source-only Python 3.7 job represents console compatibility; the standalone wheel retains its declared Python 3.10 minimum. A separate package job builds the wheel/source distribution, checks native host modules are included without compiled binaries, and imports the installed wheel outside the source checkout.
+Pushes to `dev`/`main` and pull requests run the complete Router and UNO Q portal suite on Python 3.10 and 3.12. The source-only Python 3.7 job runs console routing, native adapters and secure console-link tests; it does not run the newer UNO Q host runtime. The standalone wheel retains its declared Python 3.10 minimum. A separate package job builds the wheel/source distribution, checks native host modules are included without compiled binaries, and imports the installed wheel outside the source checkout.
 
 The Matrix tests use only the two products' `matrix/manifest.json` fixtures, checked out at the reviewed immutable revisions recorded in `.github/workflows/quality.yml`. Update those fixture revisions deliberately when the artwork contract changes. For the same offline test layout, put the VirtualGlove and rob-vision checkouts beside controller-router-lib. CI never pairs with or deploys to a console.

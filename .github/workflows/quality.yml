@@ -39,6 +39,7 @@ jobs:
       # The existing Matrix tests validate the products' actual artwork. Only
       # JSON fixture data is checked out, at reviewed immutable revisions.
       - name: Check out VirtualGlove Matrix fixture
+        if: matrix.python != '3.7'
         uses: actions/checkout@v5
         with:
           repository: mathan416/VirtualGlove
@@ -48,6 +49,7 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Check out R.O.B. Vision Matrix fixture
+        if: matrix.python != '3.7'
         uses: actions/checkout@v5
         with:
           repository: mathan416/ROB-Vision
@@ -59,10 +61,24 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
-      - name: Check console and portal source syntax
-        run: python -m compileall -q router_shared uno_portal tests
+      - name: Check console source syntax
+        run: python -m compileall -q router_shared
+      - name: Check portal and test source syntax
+        if: matrix.python != '3.7'
+        run: python -m compileall -q uno_portal tests
       - name: Run all Router and portal tests
+        if: matrix.python != '3.7'
         run: python -m unittest discover -s tests -v
+      # Python 3.7 is supported by source-based console installs. The standalone
+      # package and UNO Q host runtime are covered by the newer full-suite jobs.
+      - name: Run Python 3.7 console routing and secure-link tests
+        if: matrix.python == '3.7'
+        env:
+          PYTHONPATH: tests
+        run: >-
+          python -m unittest -v
+          test_launch test_library test_native_hosts test_pairing
+          test_pairing_install test_pairing_tls test_systems
 
   package:
     name: Standalone Python 3.10 package

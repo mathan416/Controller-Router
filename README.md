@@ -61,3 +61,9 @@ python3 scripts/sync.py --virtualglove /path/to/PowerGlove --check
 The library has no ROM or network dependency. Live console routing requires Linux uinput, udev, and RetroArch. See the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for product packaging and the [Technical Reference](docs/TECHNICAL_REFERENCE.md) for its security and runtime contracts.
 
 Native RetroPie host adapters and nested ports are included in the shared source build. The UNO Q Setup catalogue supports explicitly registered native/custom launchers, and native sessions block assignment edits. Existing host configuration and original emulator fallbacks remain installed separately. See [Integration Guide](docs/INTEGRATION_GUIDE.md#native-retropie-host-adapters).
+
+## Continuous integration
+
+Pushes to `dev`/`main` and pull requests run the complete Router and UNO Q portal suite on Python 3.7, 3.10 and 3.12. The source-only Python 3.7 job represents console compatibility; the standalone wheel retains its declared Python 3.10 minimum. A separate package job builds the wheel/source distribution, checks native host modules are included without compiled binaries, and imports the installed wheel outside the source checkout.
+
+The Matrix tests use only the two products' `matrix/manifest.json` fixtures, checked out at the reviewed immutable revisions recorded in `.github/workflows/quality.yml`. Update those fixture revisions deliberately when the artwork contract changes. For the same offline test layout, put the VirtualGlove and rob-vision checkouts beside controller-router-lib. CI never pairs with or deploys to a console.

@@ -24,8 +24,8 @@ class StartupTests(unittest.TestCase):
             self.assertTrue(scheduler.finish_startup())
             self.assertTrue(scheduler.finish_startup())
             self.assertEqual(request.call_count, 2)
-            self.assertEqual(request.call_args.args[0].full_url, 'http://127.0.0.1:8123/ready')
-            self.assertEqual(request.call_args.args[0].data, b'{}')
+            self.assertEqual(request.call_args[0][0].full_url, 'http://127.0.0.1:8123/ready')
+            self.assertEqual(request.call_args[0][0].data, b'{}')
 
     def test_hourglass_waits_for_every_installed_product(self):
         with tempfile.TemporaryDirectory() as directory:

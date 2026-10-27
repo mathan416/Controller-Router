@@ -15,7 +15,7 @@ class ManifestTests(unittest.TestCase):
     def test_both_exported_artworks_are_valid(self):
         root = Path(__file__).resolve().parents[2]
         paths = ((root / "rob-vision/matrix/manifest.json", "rob_vision"),
-                 (root / "PowerGlove-launcher/matrix/manifest.json", "virtualglove"))
+                 (root / "VirtualGlove/matrix/manifest.json", "virtualglove"))
         for path, app in paths:
             with self.subTest(app=app):
                 document = load_manifest(path, app)

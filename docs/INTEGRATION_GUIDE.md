@@ -120,3 +120,13 @@ A disabled system keeps its original launch arguments and receives no Router rou
 ## Use the shared connection authority
 
 Declare your installed console adapter with fixed credential and destination paths plus fixed restart and stop commands. Register its UNO adapter with a capability file. Reuse Router’s secure Pair console page instead of collecting SSH passwords. VirtualGlove imports its signed profile/input credential; R.O.B. Vision imports a console-scoped bearer credential and adds Buddy to Player 2. Keep game registries and actions in your product adapter.
+
+## Native RetroPie host adapters
+
+The shared build includes `retropie_native`, `native_merged_input`, and native-session discovery. The installer stages `/opt/controller-router/bin/native-route` and covers direct Libretro commands in top-level and nested port registrations. It does not replace custom launch-script arguments or automatically convert native emulator settings.
+
+Native behavior stays in the host adapter. Install `/etc/controller-router/native-adapters.json` (schema 1) with explicit provider paths and exact command SHA-256 registrations keyed by `emulators.cfg` path. A provider exposes `native_session(proc_root)` returning `(adapter_kind, system)` or `(None, None)`. Use the same detection for the daemon and Setup so saves/rollback are blocked during native play. Treat provider files and this manifest as administrator-managed executable configuration; never accept provider paths from web requests.
+
+The native registry retains the original command templates and defines runtime `user`, `state_root`, and `launcher`. Preserve console settings, pointers/lightguns, credentials, ROM registrations, existing qualified launchers and fallbacks. Disabled routing passes the original command through without merged-device setup. New native installations require explicit host qualification; catalogue presence means an installed adapter, not a blanket game certification.
+
+Configuration recovery must contain text configuration and custom routing source only. Keep emulator executables, Libretro cores, shared libraries and build output out of `backup.sh` archives and `update.sh` restores. Record their paths, versions and checksums as separately installed prerequisites.

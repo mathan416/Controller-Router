@@ -59,3 +59,5 @@ python3 scripts/sync.py --virtualglove /path/to/PowerGlove --check
 ```
 
 The library has no ROM or network dependency. Live console routing requires Linux uinput, udev, and RetroArch. See the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for product packaging and the [Technical Reference](docs/TECHNICAL_REFERENCE.md) for its security and runtime contracts.
+
+Native RetroPie host adapters and nested ports are included in the shared source build. The UNO Q Setup catalogue supports explicitly registered native/custom launchers, and native sessions block assignment edits. Existing host configuration and original emulator fallbacks remain installed separately. See [Integration Guide](docs/INTEGRATION_GUIDE.md#native-retropie-host-adapters).

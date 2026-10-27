@@ -49,7 +49,7 @@ Want Router for NES but your normal controls for Mega Drive / Genesis? You can c
 
 **Buddy's games and VirtualGlove require Controller Router enabled for NES.** You can still choose **My existing setup** for NES when you want to use your own controls instead.
 
-New Router setups start with **NES only**. Upgrades keep your choices. **All Libretro systems, including newly added systems** applies Router to every supported RetroArch system. In individual mode, a newly discovered system starts with **My existing setup**.
+New Router setups start with **NES only**. Upgrades keep your choices. **All supported systems, including newly added systems** applies Router to supported RetroArch systems and explicitly registered native host adapters. In individual mode, a newly discovered system starts with **My existing setup**.
 
 The list covers systems that offer supported RetroArch emulators. Separate emulators, such as a standalone Amiga emulator, keep their own controls. Your choice also stays saved if a system is temporarily unavailable.
 

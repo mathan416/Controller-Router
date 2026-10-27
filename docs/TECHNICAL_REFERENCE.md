@@ -175,7 +175,7 @@ EmulationStation provides the authoritative physical-controller mappings. Router
 
 The assignment document uses format version 2. It stores platform, players and their source mappings, the gesture player where applicable, and physical routing scope. The existing `virtualglove_player` field and `VirtualGlove Merged Player N` output names are retained for compatibility.
 
-`RouterStore` returns inventory, a document revision, and backup availability. A save resolves source IDs against authoritative discovered or saved mappings, checks the revision, validates the result, and keeps the previous document for rollback. Reconfiguration is blocked while any Libretro game is active. Product Setup provides the web controls; the library provides storage and routing.
+`RouterStore` returns inventory, a document revision, and backup availability. A save resolves source IDs against authoritative discovered or saved mappings, checks the revision, validates the result, and keeps the previous document for rollback. Reconfiguration is blocked while any Libretro or registered native game is active. Product Setup provides the web controls; the library provides storage and routing.
 
 | Platform | Default assignment document |
 | --- | --- |
@@ -404,3 +404,5 @@ Products expose `/api/router-pairing` only to a capability-bearing local host re
 The console helper has `/identity`, `/pair`, `/legacy-proof`, `/adopt`, `/manage`, and `/router` interfaces. `/manage` uses Router's credential for inspection, provisioning, and removal. `/router` uses the same credential with `RouterStore` revision checks for assignments and system policy. It never writes saved RetroArch configurations. Buddy's first-pair adapter adds only its Player 2 source to Router configuration; emulator configuration migration remains installation-only.
 
 Back up the UNO Q connection registry, its `tls` directory, and the private before-connection backups. On RetroPie, also back up `/var/lib/controller-router/link/{console-id,adapters.json,connection.json,certificate.pem,private-key.pem}` and each product's credential files. Restore requires the separately installed shared link service. Keep backups private; never include credentials in diagnostics or support reports. Do not snapshot a provisioning transaction in progress.
+
+Native host support and Setup share `running_game_session()` detection. Exact host command registrations extend the system catalogue; there is no automatic native emulator discovery from a binary name. See the Integration Guide for the explicit host registration and source-only recovery contract.

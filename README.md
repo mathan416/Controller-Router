@@ -10,7 +10,7 @@ VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consol
 - [Pairing Guide](docs/PAIRING_GUIDE.md): connect a console once and check each app's access.
 - [Integration Guide](docs/INTEGRATION_GUIDE.md): add an unusual controller or game.
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
-- [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behavior.
+- [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behaviour.
 - [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md): changes in the first stable shared release.
 
 The controller's **Help** page offers shorter, task-based instructions and links to the printable PDFs in [output/pdf](output/pdf/). The [documentation library](docs/README.md) is the complete reading map.
@@ -46,7 +46,7 @@ The dependency-free `router_shared` package exposes player assignment and input-
 }
 ```
 
-The descriptor identifies controls; it does not create the device or select a player. A new project supplies its own receiver and game logic. The [Integration Guide](docs/INTEGRATION_GUIDE.md) explains that boundary and gives VirtualGlove and R.O.B. Vision examples. The current portal explicitly recognizes those two apps; a third app also needs portal registration and a display manifest.
+The descriptor identifies controls; it does not create the device or select a player. A new project supplies its own receiver and game logic. The [Integration Guide](docs/INTEGRATION_GUIDE.md) explains that boundary and gives VirtualGlove and R.O.B. Vision examples. The current portal explicitly recognises those two apps; a third app also needs portal registration and a display manifest.
 
 ## Develop and validate
 
@@ -59,3 +59,11 @@ python3 scripts/sync.py --virtualglove /path/to/PowerGlove --check
 ```
 
 The library has no ROM or network dependency. Live console routing requires Linux uinput, udev, and RetroArch. See the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for product packaging and the [Technical Reference](docs/TECHNICAL_REFERENCE.md) for its security and runtime contracts.
+
+Native RetroPie host adapters and nested ports are included in the shared source build. The UNO Q Setup catalogue supports explicitly registered native/custom launchers, and native sessions block assignment edits. Existing host configuration and original emulator fallbacks remain installed separately. See [Integration Guide](docs/INTEGRATION_GUIDE.md#native-retropie-host-adapters).
+
+## Continuous integration
+
+Pushes to `dev`/`main` and pull requests run the complete Router and UNO Q portal suite on Python 3.10 and 3.12. The source-only Python 3.7 job runs console routing, native adapters and secure console-link tests; it does not run the newer UNO Q host runtime. The standalone wheel retains its declared Python 3.10 minimum. A separate package job builds the wheel/source distribution, checks native host modules are included without compiled binaries, and imports the installed wheel outside the source checkout.
+
+The Matrix tests use only the two products' `matrix/manifest.json` fixtures, checked out at the reviewed immutable revisions recorded in `.github/workflows/quality.yml`. Update those fixture revisions deliberately when the artwork contract changes. For the same offline test layout, put the VirtualGlove and rob-vision checkouts beside controller-router-lib. CI never pairs with or deploys to a console.

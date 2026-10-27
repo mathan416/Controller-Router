@@ -18,9 +18,9 @@ class RoutingTests(unittest.TestCase):
         draft={'players':[{'player':1,'sources':['id']}], 'virtualglove_player':1}
         with patch.object(routing, 'product_request', return_value={'revision':'next'}) as request:
             routing.routing({'operation':'save','app':'virtualglove','revision':'old','config':draft},self.state('virtualglove'))
-        self.assertEqual(request.call_args.args[:2], ('virtualglove','/api/controller-router'))
-        self.assertEqual(request.call_args.args[2]['config'],draft)
-        self.assertEqual(request.call_args.args[2]['revision'],'old')
+        self.assertEqual(request.call_args[0][:2], ('virtualglove','/api/controller-router'))
+        self.assertEqual(request.call_args[0][2]['config'],draft)
+        self.assertEqual(request.call_args[0][2]['revision'],'old')
 
     def test_unknown_console_and_active_game_block_without_writing(self):
         with patch.object(routing, 'product_request', return_value={'link':{'consoles':[]}}) as request:

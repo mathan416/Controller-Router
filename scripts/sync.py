@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("__init__.py", "controller_router.py", "merged_gamepad.py", "storage.py",
+         "native_sessions.py", "retropie_native.py", "retropie_daphne.py", "native_merged_input.py",
          "launch.py", "launch_install.py", "systems.py", "retroarch_udev.py", "virtual_sources.py", "LICENSE",
          "pairing.py", "pairing_console.py", "pairing_adapter.py", "pairing_install.py")
 PORTAL = ROOT / "uno_portal"

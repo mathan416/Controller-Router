@@ -1,0 +1,128 @@
+name: Router tests and package verification
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: router-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python }} Router tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: '3.7'
+            os: ubuntu-22.04
+          - python: '3.10'
+            os: ubuntu-24.04
+          - python: '3.12'
+            os: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: controller-router-lib
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: controller-router-lib
+          persist-credentials: false
+      # The existing Matrix tests validate the products' actual artwork. Only
+      # JSON fixture data is checked out, at reviewed immutable revisions.
+      - name: Check out VirtualGlove Matrix fixture
+        if: matrix.python != '3.7'
+        uses: actions/checkout@v5
+        with:
+          repository: mathan416/VirtualGlove
+          ref: 6f82b77c39831eaacf72d93afff8869b90784764
+          path: VirtualGlove
+          sparse-checkout: matrix/manifest.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Check out R.O.B. Vision Matrix fixture
+        if: matrix.python != '3.7'
+        uses: actions/checkout@v5
+        with:
+          repository: mathan416/ROB-Vision
+          ref: e9e9c5315e1948b47f379138259eef45c79a45cb
+          path: rob-vision
+          sparse-checkout: matrix/manifest.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Check console source syntax
+        run: python -m compileall -q router_shared
+      - name: Check portal and test source syntax
+        if: matrix.python != '3.7'
+        run: python -m compileall -q uno_portal tests
+      - name: Run all Router and portal tests
+        if: matrix.python != '3.7'
+        run: python -m unittest discover -s tests -v
+      # Python 3.7 is supported by source-based console installs. The standalone
+      # package and UNO Q host runtime are covered by the newer full-suite jobs.
+      - name: Run Python 3.7 console routing and secure-link tests
+        if: matrix.python == '3.7'
+        env:
+          PYTHONPATH: tests
+        run: >-
+          python -m unittest -v
+          test_launch test_library test_native_hosts test_pairing
+          test_pairing_install test_pairing_tls test_systems
+
+  package:
+    name: Standalone Python 3.10 package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: controller-router-lib
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: controller-router-lib
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: Build source distribution and wheel
+        run: |
+          python -m pip install --disable-pip-version-check build
+          python -m compileall -q scripts
+          python -m build
+      - name: Verify wheel contents and isolated installation
+        run: |
+          python - <<'PY_WHEEL'
+          from pathlib import Path
+          import zipfile
+          wheel, = Path('dist').glob('*.whl')
+          required = {'controller_router.py', 'launch.py', 'launch_install.py',
+                      'systems.py', 'native_sessions.py', 'native_merged_input.py',
+                      'retropie_native.py', 'retropie_daphne.py', 'pairing.py',
+                      'pairing_console.py', 'LICENSE'}
+          with zipfile.ZipFile(wheel) as archive:
+              assert {'router_shared/' + name for name in required} <= set(archive.namelist())
+              assert not any(name.endswith(('.so', '.dll', '.exe', '.pyc'))
+                             for name in archive.namelist())
+          PY_WHEEL
+          python -m venv "$RUNNER_TEMP/router-wheel"
+          "$RUNNER_TEMP/router-wheel/bin/python" -m pip install --no-deps dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/router-wheel/bin/python" - <<'PY_IMPORT'
+          import importlib
+          for name in ('controller_router', 'launch', 'launch_install', 'systems',
+                       'native_sessions', 'native_merged_input', 'retropie_native',
+                       'retropie_daphne', 'pairing', 'pairing_console'):
+              importlib.import_module('router_shared.' + name)
+          print('Isolated installed Router imports passed')
+          PY_IMPORT

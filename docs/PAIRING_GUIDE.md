@@ -1,41 +1,81 @@
 # Connect your console
 
-Pair your console once through Controller Router. VirtualGlove and R.O.B. Vision receive their own private credentials automatically when installed on both devices. Installing the other app later adds its access without another pairing. No SSH username or password is required.
+Pair a console once through Controller Router. VirtualGlove and R.O.B. Vision use the saved connection when each app is installed on both devices. If you install the second app later, Router can add its access without pairing the console again.
 
-Finish the game before pairing, changing app access, or removing a connection. Each console connects to one Controller Router installation at a time. Connecting it to another requires a new console code and Matrix confirmation.
+Finish any game before pairing. Keep the console and controller on the same local network. A console can be linked to one Controller Router installation at a time; moving it to another controller requires a new pairing.
 
-## Connect
+The screenshots below show the current pages with example values. Do not use the example hostname or Matrix ID as your own.
 
-After installing either controller product on a Recalbox console, run
-`sh /recalbox/share/system/controller-router/pair-console` in its terminal to
-open a fresh five-minute connection window. The Router Pair console page lists
-the matching commands for RetroPie and Batocera too.
+## 1. Open Pair console
 
-1. Open **Apps > Setup > Pair console**. Both product Setup pages have an **Open Pair console** link to this same page.
-2. Open the secure address printed by the controller installer, using its `.local` name or LAN IP. Pairing uses HTTPS port **8444**.
-3. Before accepting the local certificate, compare the browser's SHA-256 fingerprint with the fingerprint printed by the controller installer. During confirmation, its beginning also appears after **ID** on the Matrix. Stop if they differ.
-4. Enter the console hostname or IP address and paste its complete **CR1 connection code**. The console installer prints this single-use code; it lasts five minutes.
-5. Choose **Continue**, read the six Matrix digits after **PN**, and enter them within two minutes.
-6. Choose **Connect**. Wait for **Connected** and check each app's readiness below it.
+Open your controller's address in a browser and choose **Pair console** from **Apps**. You can also use the pairing button on either product's Setup page. If only one product is installed, its page opens directly; use its pairing button.
 
-![One connected console, with independent access controls for VirtualGlove and R.O.B. Vision](images/pairing-desktop.png)
+The Pair console link first opens a certificate setup page. Choose **Continue to pairing** if this phone or computer already trusts the controller. Otherwise, choose your device under **First time on this device?** and follow its steps. The secure pairing form opens on HTTPS port **8444**.
 
-### Check or repair a connection
+![Certificate setup page showing Continue to pairing and device instructions](images/pairing-trust.png)
 
-Open **Pair console > Your consoles**. **Connected** means Router has verified the console connection. **Unavailable** means it could not reach the console. **Needs attention** means the certificate, identity, or app setup needs review. App readiness is shown separately.
+The controller installer prints a certificate fingerprint. Check it against your browser's certificate details before trusting the local certificate. The **Connection details** section on the first page also shows the fingerprint. Stop if they differ.
 
-Choose **Check and repair connections** after reconnecting a device or installing another app. Use **Disable** beside an app to remove only its access, or **Remove console** to remove the whole connection. Finish any game first. A certificate change requires a fresh pairing; do not ignore the mismatch.
+## 2. Get a connection code on the console
 
-For another code, rerun the console installer or its pairing command. Existing game filenames and player assignments remain saved. Incorrect, expired, or already-used codes require a new window; five incorrect Matrix confirmations lock the current window.
+On the console you want to pair, run the command for its platform. The Pair console page has a **Copy** button beside each command:
 
-### Trust the local certificate
+- **RetroPie:** `sudo /var/lib/controller-router/pair-console`
+- **Batocera:** `/userdata/system/controller-router/pair-console`
+- **Recalbox:** `sh /recalbox/share/system/controller-router/pair-console`
 
-On iPhone or iPad, download the certificate profile from the certificate setup screen. Install it under **Settings > Profile Downloaded**, then enable it under **Settings > General > About > Certificate Trust Settings** before opening secure Setup. Verify the fingerprint against the installer first.
+![Pair console command table for RetroPie, Batocera, and Recalbox](images/pairing-commands.png)
 
-If your browser leaves secure Setup blank or rejects the local certificate, open **Pair console** from Apps or either product’s Setup page. The certificate setup screen opens on port 80 and provides certificate downloads and instructions for your device. Pairing codes and Matrix confirmation are still entered only on HTTPS port 8444.
+The console prints one complete **CR1 connection code**. It works once and expires after five minutes. If the command is missing, install or upgrade the console software first. You do not enter an SSH username or password on the pairing page.
 
-The first visit may show a browser certificate warning because this controller uses a local certificate. Open the certificate details and compare its SHA-256 fingerprint with the controller installer before continuing. After that check, download the certificate from **Trust this Setup page**. Import it into your computer or phone’s trusted certificate settings if you want to avoid repeat warnings. Private-network browser policies vary; accepting this verified local certificate for the visit also works.
+## 3. Enter the console and code
 
-## Open the controller address
+On the secure Pair console page, enter the console's `.local` hostname or LAN IP address in **Console hostname or IP**. Paste the entire CR1 code in **Connection code**, then choose **Continue**.
 
-With one controller app installed, the address opens that app. Before pairing, use its Pair console link to finish setup. With both apps installed, the address shows Apps; both use the same saved connection. Registered games select their app automatically, whether or not a browser is open.
+![Secure pairing form with console hostname, connection code, and Continue button](images/pairing-code-entry.png)
+
+If the console cannot be found by name, use its LAN IP address. If the code is rejected or has expired, run the console pairing command again to open a new window.
+
+<!-- pagebreak -->
+
+## 4. Confirm on the Matrix display
+
+After **Continue** succeeds, the Matrix display shows **PN**, then three digits, then three more digits. Enter all six digits in **Matrix confirmation code** and choose **Connect**. The sequence repeats for two minutes. The code is not shown before Continue succeeds.
+
+![Matrix confirmation form with example ID and Connect button](images/pairing-matrix-confirm.png)
+
+The page also shows a **Matrix ID**. Compare it with the ID shown on the Matrix and the beginning of the verified certificate fingerprint. If they disagree, choose **Cancel** and check which controller you opened.
+
+## 5. Check the connection
+
+Wait for **Connected. You’re ready to play.** The **Your consoles** table then shows the console's connection state and each installed app's readiness. This example uses a sample hostname; your own console and apps may differ.
+
+![Connected console table showing separate VirtualGlove and R.O.B. Vision readiness](images/pairing-connected.png)
+
+**Connected** means Router verified the console connection. Each application's **Ready** state is separate. If one app needs attention, choose **Check and repair connections**. A game can select its registered app automatically; you do not have to keep the pairing page open.
+
+## Manage or repair a connection
+
+Return to **Pair console > Your consoles** whenever you need to check a link:
+
+- **Unavailable** means Router could not reach the console. Check that it is on and on the same network, then choose **Check and repair connections**.
+- **Needs attention** means the console identity, certificate, or app setup needs review. Check the message, then repair or pair again as directed.
+- **Disable** turns off one app's access while keeping the console linked. **Enable** restores it. **Remove** deletes the console connection and its app access.
+
+Finish any game before changing access or removing a console. To add another console, run its pairing command and repeat the steps above. Existing game filenames and player assignments stay saved.
+
+## If the secure page will not open
+
+Open **Pair console** again from Apps or a product's Setup page. The certificate setup page on port 80 offers device-specific instructions:
+
+- **iPhone or iPad:** choose **Set up iPhone or iPad**. Install the downloaded profile in **Settings > Profile Downloaded** or **Settings > General > VPN & Device Management**. Then enable full trust in **Settings > General > About > Certificate Trust Settings**.
+- **Mac:** choose **Set up this Mac**, open the downloaded certificate in Keychain Access, and set its **Secure Sockets Layer (SSL)** trust to **Always Trust**. Quit and reopen Safari.
+- **Other devices:** follow the browser's local-certificate prompt. If it offers no way to continue, use the public certificate download on the setup page and import it into your device's trusted certificates.
+
+Verify the certificate fingerprint before trusting it. Do not enter a connection code on a page with an unverified or mismatched certificate. Enter codes and Matrix digits only on secure Setup at port **8444**.
+
+## If a code or confirmation fails
+
+Run the console pairing command again if the CR1 code expired, was already used, or was entered incorrectly. Five incorrect code or Matrix attempts lock the current pairing window. If the Matrix sequence expires, start a new pairing window and choose **Continue** again. If a game is running, exit it before retrying.
+
+If a console's certificate has changed, pair it again rather than accepting the mismatch. A saved console can show **Unavailable** while it is powered off; this does not erase its connection.

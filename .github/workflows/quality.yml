@@ -79,6 +79,10 @@ jobs:
           python -m unittest -v
           test_launch test_library test_native_hosts test_pairing
           test_pairing_install test_pairing_tls test_systems
+          test_cli_systems test_computer_bridge test_computer_launch
+          test_emulator_builder test_emulator_hosts test_emulator_registration
+          test_emulator_setup test_loader_session test_native_exit_install
+          test_native_exit_launch test_native_fallback test_passive_exit_watcher
 
   package:
     name: Standalone Python 3.10 package
@@ -109,9 +113,17 @@ jobs:
           required = {'controller_router.py', 'launch.py', 'launch_install.py',
                       'systems.py', 'native_sessions.py', 'native_merged_input.py',
                       'retropie_native.py', 'retropie_daphne.py', 'pairing.py',
-                      'pairing_console.py', 'LICENSE'}
+                      'pairing_console.py', 'computer_bridge.py', 'computer_launch.py',
+                      'emulator_hosts.py', 'emulator_registration.py', 'emulator_setup.py',
+                      'loader_session.py', 'native_exit_launch.py', 'passive_exit_watcher.py', 'LICENSE'}
           with zipfile.ZipFile(wheel) as archive:
-              assert {'router_shared/' + name for name in required} <= set(archive.namelist())
+              names = set(archive.namelist())
+              assert {'router_shared/' + name for name in required} <= names
+              patch_paths = ('README.md', 'build.py', 'arcem/COPYING', 'arcem/router-input.patch',
+                             'gsplus/COPYING', 'gsplus/router-input.patch')
+              for path in patch_paths:
+                  assert any(name.endswith('/share/controller-router/emulator-patches/' + path)
+                             for name in names), path
               assert not any(name.endswith(('.so', '.dll', '.exe', '.pyc'))
                              for name in archive.namelist())
           PY_WHEEL
@@ -122,7 +134,10 @@ jobs:
           import importlib
           for name in ('controller_router', 'launch', 'launch_install', 'systems',
                        'native_sessions', 'native_merged_input', 'retropie_native',
-                       'retropie_daphne', 'pairing', 'pairing_console'):
+                       'retropie_daphne', 'pairing', 'pairing_console', 'computer_bridge',
+                       'computer_launch', 'emulator_hosts', 'emulator_registration',
+                       'emulator_setup', 'loader_session', 'native_exit_launch',
+                       'passive_exit_watcher'):
               importlib.import_module('router_shared.' + name)
           print('Isolated installed Router imports passed')
           PY_IMPORT

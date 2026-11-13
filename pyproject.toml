@@ -7,7 +7,7 @@ name = "maker-controller-router"
 version = "0.3.0"
 description = "Shared Linux controller routing for maker projects"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "MIT for Router code; separately licensed emulator patches, see included COPYING files"}
 authors = [{name = "Iain Bennett"}]
 
 [tool.setuptools.packages.find]
@@ -15,3 +15,8 @@ include = ["router_shared*"]
 
 [tool.setuptools.package-data]
 router_shared = ["LICENSE"]
+
+[tool.setuptools.data-files]
+"share/controller-router/emulator-patches" = ["emulator-patches/build.py", "emulator-patches/README.md"]
+"share/controller-router/emulator-patches/arcem" = ["emulator-patches/arcem/router-input.patch", "emulator-patches/arcem/COPYING"]
+"share/controller-router/emulator-patches/gsplus" = ["emulator-patches/gsplus/router-input.patch", "emulator-patches/gsplus/COPYING"]

@@ -1,0 +1,91 @@
+--- a/gsplus/src/sdl_driver.c
++++ b/gsplus/src/sdl_driver.c
+@@ -1,3 +1,4 @@
++#include <signal.h>
+ /**********************************************************************/
+ /*                    GSplus - Apple //gs Emulator                    */
+ /*                    Based on KEGS by Kent Dickey                    */
+@@ -127,7 +128,8 @@
+ #define SDL_MAX_WIDTH	1280
+ #define SDL_MAX_HEIGHT	1024
+ 
+-static int g_quit_requested = 0;
++static volatile sig_atomic_t g_quit_requested = 0;
++static void cabinet_quit_signal(int sig) { (void)sig; g_quit_requested=1; }
+ 
+ static void sdl_create_crt(Window_info *win, int w, int h);
+ static void sdl_build_crt_mesh(Window_info *win, int w, int h);
+@@ -760,11 +762,26 @@
+ 	if(g_sdl_gamepad) {
+ 		return;				/* already have one */
+ 	}
++	const char *wanted = getenv("GSPLUS_ROUTER_NAME");
++	if(wanted && wanted[0]) {
++		SDL_JoystickID *joys = SDL_GetJoysticks(&count);
++		for(i=0; joys && i<count; i++) {
++			const char *name = SDL_GetJoystickNameForID(joys[i]);
++			if(name && strcmp(name,wanted)==0) {
++				char guid[64], mapping[1024];
++				SDL_GUIDToString(SDL_GetJoystickGUIDForID(joys[i]),guid,sizeof(guid));
++				snprintf(mapping,sizeof(mapping),"%s,%s,a:b0,b:b1,x:b3,y:b4,back:b10,start:b11,guide:b12,leftx:a0,lefty:a1,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,",guid,wanted);
++				SDL_AddGamepadMapping(mapping);
++			}
++		}
++		SDL_free(joys);
++	}
+ 	ids = SDL_GetGamepads(&count);
+ 	if(!ids) {
+ 		return;
+ 	}
+ 	for(i = 0; i < count; i++) {
++		if(wanted && wanted[0] && (!SDL_GetGamepadNameForID(ids[i]) || strcmp(SDL_GetGamepadNameForID(ids[i]),wanted)!=0)) { continue; }
+ 		if(!SDL_IsGamepad(ids[i])) {
+ 			continue;
+ 		}
+@@ -820,6 +837,10 @@
+ 						SDL_GAMEPAD_AXIS_LEFTX);
+ 	g_paddle_val[1] = SDL_GetGamepadAxis(g_sdl_gamepad,
+ 						SDL_GAMEPAD_AXIS_LEFTY);
++	if(SDL_GetGamepadButton(g_sdl_gamepad,SDL_GAMEPAD_BUTTON_DPAD_LEFT)) g_paddle_val[0]=-32768;
++	if(SDL_GetGamepadButton(g_sdl_gamepad,SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) g_paddle_val[0]=32767;
++	if(SDL_GetGamepadButton(g_sdl_gamepad,SDL_GAMEPAD_BUTTON_DPAD_UP)) g_paddle_val[1]=-32768;
++	if(SDL_GetGamepadButton(g_sdl_gamepad,SDL_GAMEPAD_BUTTON_DPAD_DOWN)) g_paddle_val[1]=32767;
+ 	joystick_update_buttons();
+ 	paddle_update_trigger_dcycs(dfcyc);
+ }
+@@ -885,6 +906,7 @@
+ 	/* Pick up fullscreen / hide-cursor changes made from the F4 config menu. */
+ 	sdl_sync_fullscreen(win);
+ 	sdl_update_cursor_visibility();
++	if(g_sdl_gamepad && SDL_GetGamepadButton(g_sdl_gamepad,SDL_GAMEPAD_BUTTON_GUIDE) && SDL_GetGamepadButton(g_sdl_gamepad,SDL_GAMEPAD_BUTTON_START)) g_quit_requested=1;
+ 
+ 	while(SDL_PollEvent(&ev)) {
+ 		switch(ev.type) {
+@@ -1488,6 +1510,7 @@
+ 	int	mdepth = 32;		/* ARGB8888 -> 32-bit pixels */
+ 	int	ret;
+ 
++	signal(SIGTERM,cabinet_quit_signal);
+ 	printf("GSplus %s (SDL3)\n", GSPLUS_VERSION_STR);
+ 
+ 	ret = parse_argv(argc, argv, 1);
+@@ -1517,6 +1540,8 @@
+ 		sdl_update_display(&g_mainwin_info);
+ 	}
+ 
++	iwm_flush_cur_disk();
++	(void)config_write_config_kegs_file(0);
+ 	sdl_snd_shutdown();
+ 	SDL_Quit();
+ 	return 0;
+--- a/gsplus/src/CMakeLists.txt
++++ b/gsplus/src/CMakeLists.txt
+@@ -22,7 +22,7 @@
+ 
+ # Minimum CMake version. 3.20 is modern, widely available, and is what we'll
+ # need for the SDL3 + macOS bundle work coming later.
+-cmake_minimum_required(VERSION 3.20)
++cmake_minimum_required(VERSION 3.16)
+ 
+ # ----------------------------------------------------------------------------
+ # macOS minimum deployment target. MUST be set BEFORE project()/enable_language

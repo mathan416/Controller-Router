@@ -1,0 +1,50 @@
+--- a/SDL/DispKbd.c
++++ b/SDL/DispKbd.c
+@@ -8,8 +8,12 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <signal.h>
++static volatile sig_atomic_t router_quit;
++static void router_signal(int sig) { (void)sig; router_quit=1; }
+ 
+ #include "platform.h"
++static SDL_Joystick *router_pad;
+ 
+ #include "../armdefs.h"
+ #include "../dagstandalone.h"
+@@ -152,6 +156,16 @@
+ Kbd_PollHostKbd(ARMul_State *state)
+ {
+   SDL_Event event;
++  if (router_quit) { ARMul_Exit(state,0); return 0; }
++  if (router_pad) {
++    static int previous[6];
++    static const arch_key_id keys[6]={ARCH_KEY_up,ARCH_KEY_down,ARCH_KEY_left,ARCH_KEY_right,ARCH_KEY_space,ARCH_KEY_return};
++    int hat=SDL_JoystickGetHat(router_pad,0);
++    int x=SDL_JoystickGetAxis(router_pad,0), y=SDL_JoystickGetAxis(router_pad,1);
++    int values[6]={!!(hat&SDL_HAT_UP)||y < -16000,!!(hat&SDL_HAT_DOWN)||y>16000,!!(hat&SDL_HAT_LEFT)||x < -16000,!!(hat&SDL_HAT_RIGHT)||x>16000,SDL_JoystickGetButton(router_pad,0),SDL_JoystickGetButton(router_pad,11)};
++    if (SDL_JoystickGetButton(router_pad,12) && values[5]) { ARMul_Exit(state,0); return 0; }
++    for (int i=0;i<6;i++) if(values[i]!=previous[i]) { keyboard_key_changed(&KBD,keys[i],!values[i]); previous[i]=values[i]; }
++  }
+   while (SDL_PollEvent(&event)) {
+     switch (event.type) {
+     case SDL_EVENT_QUIT:
+@@ -187,12 +201,16 @@
+ {
+   int exit_code;
+ 
+-  if (SDL_FAILED(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))) {
++  if (SDL_FAILED(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK))) {
+     ControlPane_Error(false,"Failed to initialise SDL: %s", SDL_GetError());
+     return EXIT_FAILURE;
+   }
+ 
++  signal(SIGTERM,router_signal);
++  SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");
++  for (int i=0;i<SDL_NumJoysticks();i++) if (!strcmp(SDL_JoystickNameForIndex(i),"ArcEm Routed Player 1")) { router_pad=SDL_JoystickOpen(i); break; }
+   exit_code = dagstandalone(argc, argv);
++  if(router_pad)SDL_JoystickClose(router_pad);
+ 
+   SDL_Quit();
+ 

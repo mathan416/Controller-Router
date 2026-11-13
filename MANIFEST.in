@@ -1,0 +1,8 @@
+include README.md LICENSE
+recursive-include docs *.md *.png
+recursive-include emulator-patches *.py *.patch *.md COPYING
+recursive-include scripts *.py
+recursive-include tests *.py *.c *.md
+recursive-include uno_portal *.py *.html *.png *.pdf *.yaml *.ino *.service VERSION
+recursive-include output/pdf *.pdf
+global-exclude __pycache__ *.py[cod] .DS_Store *.pem *.key

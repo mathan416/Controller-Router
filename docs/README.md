@@ -7,6 +7,8 @@ Use Canadian English in project-authored documentation, Help, website copy, and 
 - [Integration Guide](INTEGRATION_GUIDE.md): build a unique controller integration, choose an input boundary, and use assignment APIs.
 - [Deployment Guide](DEPLOYMENT_GUIDE.md): package the console library, optional UNO Q runtime, upgrades, and recovery.
 - [Technical Reference](TECHNICAL_REFERENCE.md): architecture, API examples, leases, Matrix protocol, storage, and extension boundaries.
+- [Optional Emulator Adapters](EMULATOR_ADAPTERS.md): computer bridges, native fallbacks, and host qualification.
+- [0.3.0 release notes](RELEASE_NOTES_0.3.0.md): changes, validation and remaining release acceptance.
 
 R.O.B. Vision and VirtualGlove are source-cited integration examples. The guides describe Controller Router itself; product installation and gameplay instructions belong to those projects.
 

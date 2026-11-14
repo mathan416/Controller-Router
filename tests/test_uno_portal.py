@@ -7,7 +7,7 @@ import shutil
 import re
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
-from json import loads
+from json import dumps, loads
 from pathlib import Path
 from unittest.mock import patch
 
@@ -70,6 +70,213 @@ class ProductSocketDirectoryTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     products.ensure_socket_directory()
             self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+
+
+class RepeatPortalInstallTests(unittest.TestCase):
+    def test_static_payload_detects_same_version_hotfix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'source'; installed = Path(directory) / 'installed'
+            for root in (source, installed):
+                (root / 'host').mkdir(parents=True)
+                (root / 'VERSION').write_text('0.3.3\n')
+                (root / 'host/products.py').write_text('old\n')
+            self.assertTrue(portal_install.matching_static_payload(source, installed))
+            (source / 'host/products.py').write_text('hotfix\n')
+            self.assertFalse(portal_install.matching_static_payload(source, installed))
+            (source / 'host/products.py').write_text('old\n')
+            (source / 'install.py').write_text('new installer\n')
+            (installed / 'install.py').write_text('old installer\n')
+            self.assertFalse(portal_install.matching_static_payload(source, installed))
+            self.assertTrue(portal_install.matching_static_payload(source, installed,
+                                                                    exclude_quiet_updates=True))
+
+    def test_private_running_matrix_and_both_http_endpoints_are_required(self):
+        response = unittest.mock.MagicMock(); response.__enter__.return_value.status = 200
+        good = subprocess.CompletedProcess([], 0, stdout=(
+            'true|{"8123/tcp":[{"HostIp":"127.0.0.1","HostPort":"8123"}]}\n'))
+        with patch.object(portal_install.subprocess, 'run', return_value=good), \
+             patch.object(portal_install, 'urlopen', return_value=response) as request:
+            self.assertTrue(portal_install.healthy_installed_portal())
+            self.assertEqual([call.args[0] for call in request.call_args_list], [
+                'http://127.0.0.1:8123/health', 'http://127.0.0.1/api/state'])
+        for output in ('false|{"8123/tcp":[{"HostIp":"127.0.0.1","HostPort":"8123"}]}',
+                       'true|{"8123/tcp":[{"HostIp":"0.0.0.0","HostPort":"8123"}]}'):
+            with self.subTest(output=output), patch.object(portal_install.subprocess, 'run',
+                                                       return_value=subprocess.CompletedProcess([], 0, stdout=output)), \
+                 patch.object(portal_install, 'urlopen') as request:
+                self.assertFalse(portal_install.healthy_installed_portal())
+                request.assert_not_called()
+
+    def test_identical_healthy_install_registers_products_without_app_lab(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'source'; installed = root / 'installed'
+            source.mkdir(); installed.mkdir()
+            (source / 'VERSION').write_text('0.3.3\n')
+            (installed / 'VERSION').write_text('0.3.3\n')
+            (source / 'install.py').write_text('same installer\n')
+            (installed / 'install.py').write_text('same installer\n')
+            for place in (source, installed):
+                (place / 'host').mkdir()
+                (place / 'host/products.py').write_text('same launcher\n')
+            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'validate_package'), \
+                 patch.object(portal_install, 'matching_static_payload', return_value=True), \
+                 patch.object(portal_install, 'healthy_installed_portal', return_value=True), \
+                 patch.object(portal_install, 'command') as command, \
+                 patch.object(portal_install, 'app_listing') as listing, \
+                 patch.object(portal_install, 'retire_early_start'):
+                self.assertIn('healthy', portal_install.install())
+                self.assertEqual(command.call_args_list[0].args,
+                                 ('python3', str(installed / 'host/products.py'), 'start-all'))
+                self.assertEqual(command.call_count, 3)
+                listing.assert_not_called()
+
+    def test_unhealthy_equal_version_enters_repair_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'source'; installed = root / 'installed'
+            source.mkdir(); installed.mkdir()
+            (source / 'VERSION').write_text('0.3.3\n')
+            (installed / 'VERSION').write_text('0.3.3\n')
+            (source / 'install.py').write_text('same installer\n')
+            (installed / 'install.py').write_text('same installer\n')
+            for place in (source, installed):
+                (place / 'host').mkdir()
+                (place / 'host/products.py').write_text('same launcher\n')
+            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'validate_package'), \
+                 patch.object(portal_install, 'matching_static_payload', return_value=True), \
+                 patch.object(portal_install, 'healthy_installed_portal', return_value=False), \
+                 patch.object(portal_install, 'app_listing', side_effect=RuntimeError('repair path')):
+                with self.assertRaisesRegex(RuntimeError, 'repair path'):
+                    portal_install.install()
+
+    def test_installer_only_upgrade_is_atomic_and_skips_app_lab(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'source'; installed = root / 'installed'
+            source.mkdir(); installed.mkdir()
+            for place in (source, installed):
+                (place / 'VERSION').write_text('0.3.3\n')
+            (source / 'install.py').write_text('corrected installer\n')
+            (installed / 'install.py').write_text('old installer\n')
+            for place in (source, installed):
+                (place / 'host').mkdir()
+                (place / 'host/products.py').write_text('same launcher\n')
+            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'validate_package'), \
+                 patch.object(portal_install, 'healthy_installed_portal', return_value=True), \
+                 patch.object(portal_install, 'command') as command, \
+                 patch.object(portal_install, 'app_listing') as listing, \
+                 patch.object(portal_install, 'retire_early_start'):
+                self.assertIn('healthy', portal_install.install())
+                listing.assert_not_called()
+                self.assertEqual(command.call_count, 3)
+            self.assertEqual((installed / 'install.py').read_text(), 'corrected installer\n')
+            self.assertFalse(any(installed.glob('.router-update-*')))
+
+    def test_installer_only_upgrade_rolls_back_on_registration_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'source'; installed = root / 'installed'
+            source.mkdir(); installed.mkdir()
+            for place in (source, installed):
+                (place / 'VERSION').write_text('0.3.3\n')
+            (source / 'install.py').write_text('corrected installer\n')
+            old = installed / 'install.py'; old.write_text('old installer\n'); old.chmod(0o700)
+            for place in (source, installed):
+                (place / 'host').mkdir()
+                (place / 'host/products.py').write_text('same launcher\n')
+
+            def fail_registration(*args, **kwargs):
+                self.assertEqual(old.read_text(), 'corrected installer\n')
+                raise RuntimeError('registration failed')
+
+            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'validate_package'), \
+                 patch.object(portal_install, 'healthy_installed_portal', return_value=True), \
+                 patch.object(portal_install, 'command', side_effect=fail_registration), \
+                 patch.object(portal_install, 'app_listing') as listing:
+                with self.assertRaisesRegex(RuntimeError, 'registration failed'):
+                    portal_install.install()
+                listing.assert_not_called()
+            self.assertEqual(old.read_text(), 'old installer\n')
+            self.assertEqual(old.stat().st_mode & 0o777, 0o700)
+            self.assertFalse(any(installed.glob('.router-update-*')))
+
+    def test_installer_and_product_launcher_update_together_and_roll_back_together(self):
+        for fail in (False, True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory); source = root / 'source'; installed = root / 'installed'
+                for place in (source, installed):
+                    (place / 'host').mkdir(parents=True)
+                    (place / 'VERSION').write_text('0.3.3\n')
+                (source / 'install.py').write_text('new installer\n')
+                (source / 'host/products.py').write_text('new launcher\n')
+                old_installer = installed / 'install.py'
+                old_launcher = installed / 'host/products.py'
+                old_installer.write_text('old installer\n'); old_installer.chmod(0o700)
+                old_launcher.write_text('old launcher\n'); old_launcher.chmod(0o600)
+
+                def registration(*args, **kwargs):
+                    self.assertEqual(old_installer.read_text(), 'new installer\n')
+                    self.assertEqual(old_launcher.read_text(), 'new launcher\n')
+                    if fail:
+                        raise RuntimeError('registration failed')
+                    return subprocess.CompletedProcess(args, 0)
+
+                with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                     patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                     patch.object(portal_install, 'validate_package'), \
+                     patch.object(portal_install, 'healthy_installed_portal', return_value=True), \
+                     patch.object(portal_install, 'command', side_effect=registration), \
+                     patch.object(portal_install, 'app_listing') as listing, \
+                     patch.object(portal_install, 'retire_early_start'):
+                    if fail:
+                        with self.assertRaisesRegex(RuntimeError, 'registration failed'):
+                            portal_install.install()
+                    else:
+                        self.assertIn('healthy', portal_install.install())
+                    listing.assert_not_called()
+                self.assertEqual(old_installer.read_text(),
+                                 'old installer\n' if fail else 'new installer\n')
+                self.assertEqual(old_launcher.read_text(),
+                                 'old launcher\n' if fail else 'new launcher\n')
+                if fail:
+                    self.assertEqual(old_installer.stat().st_mode & 0o777, 0o700)
+                    self.assertEqual(old_launcher.stat().st_mode & 0o777, 0o600)
+                self.assertFalse(any(installed.glob('.router-update-*')))
+                self.assertFalse(any(root.glob('.router-quiet-update-*')))
+
+    def test_second_file_update_failure_restores_first_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'source'; installed = root / 'installed'
+            for place in (source, installed):
+                (place / 'host').mkdir(parents=True)
+                (place / 'VERSION').write_text('0.3.3\n')
+            (source / 'install.py').write_text('new installer\n')
+            (source / 'host/products.py').write_text('new launcher\n')
+            (installed / 'install.py').write_text('old installer\n')
+            (installed / 'host/products.py').write_text('old launcher\n')
+            original = portal_install.replace_static_file
+
+            def fail_second(path, content, mode):
+                if path.name == 'products.py':
+                    raise OSError('second replacement failed')
+                return original(path, content, mode)
+
+            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'validate_package'), \
+                 patch.object(portal_install, 'healthy_installed_portal', return_value=True), \
+                 patch.object(portal_install, 'replace_static_file', side_effect=fail_second), \
+                 patch.object(portal_install, 'command') as command:
+                with self.assertRaisesRegex(OSError, 'second replacement failed'):
+                    portal_install.install()
+                command.assert_not_called()
+            self.assertEqual((installed / 'install.py').read_text(), 'old installer\n')
+            self.assertEqual((installed / 'host/products.py').read_text(), 'old launcher\n')
 
 
 class MatrixComposePortTests(unittest.TestCase):
@@ -766,6 +973,43 @@ class InstallerTests(unittest.TestCase):
                 output = products.product_compose("virtualglove")
             self.assertEqual(loads(output.read_text())["networks"]["default"]["name"],
                              "virtualglove-runtime_default")
+
+    def test_product_runtime_omits_only_stale_optional_led_binds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "rob-vision/.cache").mkdir(parents=True)
+            cached_file = root / "rob-vision/.cache/app-compose.yaml"
+            cached_file.write_text("services: {}\n")
+            present_led = root / "current-led"
+            present_led.mkdir()
+            volumes = [
+                {"type": "bind", "source": "/sys/class/leds/retired-led",
+                 "target": "/sys/class/leds/retired-led"},
+                {"type": "bind", "source": str(present_led),
+                 "target": "/sys/class/leds/current-led"},
+                {"type": "bind", "source": "/nonexistent/product-data",
+                 "target": "/app/data"},
+            ]
+            cached = {"services": {"main": {"volumes": volumes}}}
+            with patch.object(products, "ROOT", root), \
+                 patch.object(products, "RUNTIME", root / "runtime"), \
+                 patch.object(products, "SOCKET_DIR", root / "socket"), \
+                 patch.object(products.subprocess, "run") as run:
+                run.return_value.stdout = dumps(cached)
+                output = products.product_compose("rob-vision")
+            runtime_volumes = loads(output.read_text())["services"]["main"]["volumes"]
+            self.assertNotIn(volumes[0], runtime_volumes)
+            self.assertIn(volumes[1], runtime_volumes)
+            self.assertIn(volumes[2], runtime_volumes)
+            self.assertEqual(cached_file.read_text(), "services: {}\n")
+
+    def test_existing_led_bind_is_preserved(self):
+        volume = {"type": "bind", "source": "/sys/class/leds/current-led",
+                  "target": "/sys/class/leds/current-led"}
+        with patch.object(products, "Path") as path:
+            path.return_value.exists.return_value = True
+            self.assertFalse(products._stale_led_bind(volume))
+            path.assert_called_once_with(volume["source"])
 
     def test_matrix_upgrade_holds_watchdog_lock_through_swap_start_and_failure(self):
         import fcntl

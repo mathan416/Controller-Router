@@ -49,11 +49,17 @@ class UnitOrderTests(unittest.TestCase):
         self.assertEqual(sum('daemon-reload' in c for c in self.commands), 1)
         self.assertFalse(any('restart' in c or 'start' in c for c in self.commands))
 
-    def test_missing_writer_is_untouched(self):
+    def test_missing_writer_gets_inert_ordering_before_vendor_unit_appears(self):
         self.fields = 'LoadState=not-found\nUnitFileState=\nType=\n'
-        self.assertIn('not present', mod.install(self.root, self.run_command))
-        self.assertFalse(self.target().exists())
-        self.assertFalse(any('daemon-reload' in c for c in self.commands))
+        self.assertIn('Installed', mod.install(self.root, self.run_command))
+        self.assertEqual(self.target().read_bytes(), mod.CONTENT)
+        self.assertEqual(sum('daemon-reload' in c for c in self.commands), 1)
+        self.assertFalse(any('enable' in c or 'start' in c for c in self.commands))
+        # App Lab may install the writer later during its own system init.
+        self.fields = 'LoadState=loaded\nUnitFileState=enabled\nType=oneshot\n'
+        self.assertIn('already', mod.install(self.root, self.run_command))
+        self.assertEqual(sum('daemon-reload' in c for c in self.commands), 1)
+        self.assertEqual(self.target().read_bytes(), mod.CONTENT)
 
     def test_new_dropin_ineffective_is_removed_after_reload(self):
         self.after_fields = 'network-online.target\n'

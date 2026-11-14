@@ -96,13 +96,13 @@ During RetroPie installation or upgrade, Router backs up the FCEUmm and Nestopia
 
 ## UNO Q App Lab first-boot ordering
 
-Some UNO Q images run an enabled `arduino-burn-bootloader-unoq.service` once to install the MCU bootloader. If App Lab starts its default Matrix app at the same time, the two programmers can contend for the local MCU. On a supported UNO Q with that installed oneshot service and the App Lab system service, run the bundled helper as root during product installation or upgrade:
+Some UNO Q images run an enabled `arduino-burn-bootloader-unoq.service` once to install the MCU bootloader. If App Lab starts its default Matrix app at the same time, the two programmers can contend for the local MCU. On a supported UNO Q with the App Lab system service loaded, run the bundled helper as root during product installation or upgrade:
 
 ```sh
 sudo python3 -m router_shared.uno_boot_order
 ```
 
-The helper creates an ordering-only systemd drop-in and reloads systemd; it does not restart either service or enable a disabled bootloader writer. The rule takes effect on the next start or boot. When both enabled units are in the same boot transaction, App Lab starts after the oneshot writer finishes. It does not serialize manual starts of the writer after App Lab is already running or resolve unrelated SWD or firmware errors. A R.O.B. Vision-only installation needs this explicit root step; run it from the installed R.O.B. Vision directory so Python can find its bundled Router package. If the relevant writer is absent, the helper leaves the system unchanged. A disabled writer remains disabled; if it is enabled later, the ordering rule is already present. Review any conflicting existing drop-in rather than overwriting it.
+The helper creates an ordering-only systemd drop-in and reloads systemd; it does not restart either service or enable a disabled bootloader writer. It installs the rule even when the writer is not yet present, so a later App Lab system initialization can add the writer without leaving an ordering gap. The rule takes effect on the next start or boot. When both enabled units are in the same boot transaction, App Lab starts after the oneshot writer finishes. It does not serialize manual starts of the writer after App Lab is already running or resolve unrelated SWD or firmware errors. A R.O.B. Vision-only installation needs this explicit root step; run it from the installed R.O.B. Vision directory so Python can find its bundled Router package. A disabled writer remains disabled; if it is enabled later, the ordering rule is already present. Review any conflicting existing drop-in rather than overwriting it.
 
 ## Optional UNO Q runtime
 

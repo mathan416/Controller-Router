@@ -26,7 +26,7 @@ The wheel requires Python 3.10 or newer. Source-based console support on Python 
 
 ## UNO Q boot ordering
 
-On boards with Arduino's one-shot bootloader writer, the root setup helper can install an ordering-only systemd drop-in so App Lab waits for that writer when both are queued during boot. It does not enable the writer, change its completion flag, serialize later manual uploads, or resolve independent flash errors. VirtualGlove root setup runs this helper; R.O.B.-only installation reports the separate administrator command. The original failed first boot overlapped both programmers, but its primary upload error was not retained. A separate flash-write timeout later recovered after a local reset and retry; a general fix for that timeout is not established.
+On verified UNO Q boards with the App Lab system service loaded, the root setup helper installs an ordering-only systemd drop-in so App Lab waits for Arduino's one-shot bootloader writer when both are queued during boot. It installs the rule even if App Lab has not yet added the writer unit. It does not enable the writer, change its completion flag, serialize later manual uploads, or resolve independent flash errors. VirtualGlove root setup runs this helper; R.O.B.-only installation reports the separate administrator command. The original failed first boot overlapped both programmers, but its primary upload error was not retained. A separate flash-write timeout later recovered after a local reset and retry; a general fix for that timeout is not established.
 
 ## Validation and remaining acceptance
 

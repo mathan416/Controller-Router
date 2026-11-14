@@ -18,7 +18,9 @@ Release preparation: this version has not been published. The latest published R
 
 ## Version and upgrade boundaries
 
-The reusable library is **0.3.0**; the independent UNO Q runtime installer version is **0.3.2**. The Matrix firmware remains **0.2.0** because its source is unchanged. The new runtime version protects it from replacement by older product bundles carrying runtime 0.3.1. Both products must bundle the same shared source.
+The reusable library is **0.3.0**; the independent UNO Q runtime installer version is **0.3.3**. The Matrix firmware remains **0.2.0** because its source is unchanged. The runtime version protects the updated portal and Matrix app from replacement by older product bundles carrying runtime 0.3.2 or earlier. Both products must bundle the same shared source.
+
+The Matrix app descriptor does not publish a port through App Lab. The installer and portal reconcile a loopback-only Matrix binding after App Lab starts the app. If an installed product cannot report that its game is idle, automatic recreation is deferred until its status is available; the status recheck reduces, but cannot eliminate, a race with independently started games.
 
 The wheel requires Python 3.10 or newer. Source-based console support on Python 3.7 is covered by the scoped console CI job; this does not claim that the complete UNO Q host or wheel supports Python 3.7.
 
@@ -27,6 +29,8 @@ The wheel requires Python 3.10 or newer. Source-based console support on Python 
 The preceding source revision passed all 11 CI jobs across the three projects. Development deployment on the Raspberry Pi 4 RetroPie console verified merged control paths; the UNO Q entry-page recovery check completed in 15.7 seconds without restarting product or Matrix services. Those are scoped development results, not certification of the final downloadable packages or every platform.
 
 On 13 November 2026, the cabinet owner confirmed controls and exit for ArcEm, GSplus and SimCoupe with Router enabled, and keyboard or mouse controls and exit with **My existing setup** for all three. On this cabinet, ArcEm and SimCoupe's preserved native joystick settings do not select independent physical gamepads; GSplus has no saved physical controller identity and observed native selection was R.O.B. Vision Controller 2. Paperboy responded normally while Pipe Dream had slow input response; that game-specific symptom remains uninvestigated. These results cover the cabinet's installed builds and settings, not other installations or all hardware. The live paired UNO Q portal listed the three systems and its web and pairing endpoints responded, but this is not candidate-package install and upgrade acceptance.
+
+The test UNO Q running App Lab 0.14.1 exposed a port-format incompatibility and a fresh-install socket-directory race. Qualification builds installed R.O.B. Vision followed by VirtualGlove; both were upgraded, the R.O.B. product rollback and VirtualGlove payload transaction rollback were exercised, and Router, Matrix and product endpoints responded. The 0.3.3 no-published-port candidate passed an App Lab restart and a device reboot; the subsequent watchdog lock fix passed an upgrade and App Lab restart. The first reboot after the test device system update failed its firmware upload and required manual local recovery; reliable boot after such a failure is not established. App Lab 0.14.1 remains a qualification target, not a validated production VirtualGlove installer baseline.
 
 Before publication, build from the final committed release revision, verify checksums and bundled guides, and qualify candidate installation, upgrade and rollback on staging hardware in both product installation orders. Keep pairing, saved assignments, game registries and controls through those checks. Game-input, exit and reconnect acceptance must use the candidate's actual platform and emulator. No ROMs are distributed.
 

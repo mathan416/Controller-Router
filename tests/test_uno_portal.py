@@ -26,6 +26,306 @@ def isolated_sleep(module, **kwargs):
         yield clock.sleep
 
 
+class ProductSocketDirectoryTests(unittest.TestCase):
+    def test_creates_private_directory_and_repairs_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            socket_dir = Path(directory) / "router"
+            with patch.object(products, "SOCKET_DIR", socket_dir):
+                products.ensure_socket_directory()
+                self.assertEqual(socket_dir.stat().st_mode & 0o777, 0o700)
+                socket_dir.chmod(0o755)
+                products.ensure_socket_directory()
+                self.assertEqual(socket_dir.stat().st_mode & 0o777, 0o700)
+
+    def test_existing_socket_is_not_replaced(self):
+        import socket
+        with tempfile.TemporaryDirectory() as directory:
+            socket_dir = Path(directory) / "router"
+            socket_dir.mkdir(mode=0o700)
+            path = socket_dir / "control.sock"
+            with socket.socket(socket.AF_UNIX) as listener:
+                listener.bind(str(path))
+                inode = path.stat().st_ino
+                with patch.object(products, "SOCKET_DIR", socket_dir):
+                    products.ensure_socket_directory()
+                self.assertEqual(path.stat().st_ino, inode)
+
+    def test_rejects_directory_owned_by_another_user(self):
+        with tempfile.TemporaryDirectory() as directory:
+            socket_dir = Path(directory) / "router"
+            socket_dir.mkdir()
+            with patch.object(products, "SOCKET_DIR", socket_dir), \
+                 patch.object(products.os, "getuid", return_value=-1):
+                with self.assertRaisesRegex(RuntimeError, "not owned"):
+                    products.ensure_socket_directory()
+
+    def test_rejects_symlink_without_changing_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "other"
+            target.mkdir(mode=0o755)
+            socket_dir = root / "router"
+            socket_dir.symlink_to(target, target_is_directory=True)
+            with patch.object(products, "SOCKET_DIR", socket_dir):
+                with self.assertRaises(OSError):
+                    products.ensure_socket_directory()
+            self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+
+
+class MatrixComposePortTests(unittest.TestCase):
+
+
+
+
+
+
+
+    def test_app_lab_long_form_is_restricted_and_other_services_unchanged(self):
+        source = ('name: controller-router\nservices:\n  main:\n    ports:\n'
+                  '      - mode: ingress\n        target: 8123\n'
+                  '        published: "8123"\n        protocol: tcp\n'
+                  '  other:\n    ports:\n      - 8123:8123\nnetworks:\n  default: {}\n')
+        updated, changed = portal_install._matrix_loopback_compose(source)
+        self.assertTrue(changed)
+        self.assertIn('        protocol: tcp\n        host_ip: 127.0.0.1\n  other:', updated)
+        self.assertIn('  other:\n    ports:\n      - 8123:8123\n', updated)
+        self.assertEqual(portal_install._matrix_loopback_compose(updated), (updated, False))
+
+    def test_legacy_short_and_already_restricted_forms(self):
+        for value in ('8123:8123', '"8123:8123"'):
+            source = 'services:\n  main:\n    ports:\n      - ' + value + '\n'
+            updated, changed = portal_install._matrix_loopback_compose(source)
+            self.assertTrue(changed)
+            self.assertIn('127.0.0.1:8123:8123', updated)
+            self.assertEqual(portal_install._matrix_loopback_compose(updated), (updated, False))
+
+    def test_rejects_extra_public_binding_even_when_loopback_is_present(self):
+        for extra in ('0.0.0.0:8123:8123', '8123:8123/udp', '9999:8123',
+                      'mode: ingress\n        target: 8123\n        published: "8123"\n        host_ip: 0.0.0.0'):
+            with self.subTest(extra=extra):
+                source = ('services:\n  main:\n    ports:\n'
+                          '      - 127.0.0.1:8123:8123\n      - ' + extra + '\n')
+                with self.assertRaisesRegex(RuntimeError, "exactly one Matrix service port"):
+                    portal_install._matrix_loopback_compose(source)
+
+    def test_rejects_ambiguous_or_incompatible_bindings(self):
+        for port in ('0.0.0.0:8123:8123', '8123:8123/udp', '8124:8123',
+                     '8123:8123\n      - 8123:8123'):
+            with self.subTest(port=port):
+                source = 'services:\n  main:\n    ports:\n      - ' + port + '\n'
+                with self.assertRaises(RuntimeError):
+                    portal_install._matrix_loopback_compose(source)
+
+
+class MatrixPortRecoveryTests(unittest.TestCase):
+    def test_watchdog_inspects_actual_binding_only_after_acquiring_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); matrix = root / 'controller-router'; matrix.mkdir()
+            (matrix / '.cache').mkdir(); (matrix / '.cache/app-compose.yaml').write_text('services:\n  main:\n    image: test\n')
+            (matrix / 'app.yaml').write_text('name: Matrix\n')
+            locked = []
+
+            @contextmanager
+            def acquired(_lock):
+                locked.append(True)
+                try:
+                    yield
+                finally:
+                    locked.pop()
+
+            def inspect(args, **_kwargs):
+                self.assertTrue(locked, 'container inspection must occur under the lifecycle lock')
+                # Simulates an upgrade that made the binding healthy while this
+                # watchdog was waiting for the lock.
+                if '{{.State.Running}}' in args:
+                    return subprocess.CompletedProcess(args, 0, stdout='true\n')
+                return subprocess.CompletedProcess(args, 0, stdout='[{"HostIp":"127.0.0.1","HostPort":"8123"}]')
+
+            with patch.object(broker, 'ROOT', root), patch.object(broker, 'MATRIX_STATE', root / 'state'), \
+                 patch.object(broker, 'matrix_port_lock', acquired), \
+                 patch.object(broker.subprocess, 'run', side_effect=inspect), \
+                 patch.object(broker, 'configure_loopback') as configure:
+                self.assertFalse(broker.ensure_matrix_port())
+                configure.assert_not_called()
+
+    def test_watchdog_waits_for_upgrade_then_does_not_recreate_healthy_container(self):
+        from uno_portal.host.matrix_port import matrix_port_lock
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); matrix = root / 'controller-router'; matrix.mkdir()
+            (matrix / '.cache').mkdir()
+            (matrix / '.cache/app-compose.yaml').write_text('services:\n  main:\n    image: test\n')
+            (matrix / 'app.yaml').write_text('name: Matrix\n')
+            entered = threading.Event(); finished = threading.Event(); result = []
+            def watchdog():
+                entered.set()
+                try:
+                    result.append(broker.ensure_matrix_port())
+                finally:
+                    finished.set()
+            with patch.object(broker, 'ROOT', root), patch.object(broker, 'MATRIX_STATE', root / 'state'), \
+                 patch.object(broker.subprocess, 'run') as inspect, \
+                 patch.object(broker, 'configure_loopback') as configure:
+                inspect.side_effect = [subprocess.CompletedProcess([], 0, stdout='true\n'),
+                                       subprocess.CompletedProcess([], 0, stdout='[{"HostIp":"127.0.0.1","HostPort":"8123"}]')]
+                with matrix_port_lock(root / 'state/.matrix-port.lock'):
+                    thread = threading.Thread(target=watchdog)
+                    thread.start()
+                    self.assertTrue(entered.wait(2))
+                    self.assertFalse(finished.wait(0.1))
+                    inspect.assert_not_called()
+                thread.join(2)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(result, [False])
+                configure.assert_not_called()
+
+
+    def test_unpublished_app_gets_single_loopback_mapping(self):
+        source = 'name: controller-router\nservices:\n  main:\n    image: example\n'
+        updated, changed = portal_install._matrix_loopback_compose(source)
+        self.assertTrue(changed)
+        self.assertIn('    ports:\n      - "127.0.0.1:8123:8123"\n', updated)
+        self.assertEqual(portal_install._matrix_loopback_compose(updated), (updated, False))
+        self.assertNotIn('ports:', (portal_install.SOURCE / 'app/app.yaml').read_text())
+
+    def test_recreation_is_idempotent_and_failed_recreation_restores_generated_file(self):
+        from uno_portal.host.matrix_port import configure_loopback
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); compose = root / 'app-compose.yaml'; lock = root / 'data/port.lock'
+            source = 'services:\n  main:\n    image: example\n'; compose.write_text(source)
+            runner = unittest.mock.Mock(side_effect=subprocess.CalledProcessError(1, ['docker']))
+            with self.assertRaises(subprocess.CalledProcessError):
+                configure_loopback(compose, lock, runner)
+            self.assertEqual(compose.read_text(), source)
+            runner.side_effect = None
+            self.assertTrue(configure_loopback(compose, lock, runner))
+            self.assertFalse(configure_loopback(compose, lock, runner))
+            self.assertEqual(runner.call_count, 2)
+
+    def test_installer_configures_loopback_without_relocking_lifecycle_lock(self):
+        from uno_portal.host.matrix_port import configure_loopback, matrix_port_lock
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); compose = root / 'app-compose.yaml'; lock = root / 'state/port.lock'
+            compose.write_text('services:\n  main:\n    image: example\n')
+            runner = unittest.mock.Mock()
+            with matrix_port_lock(lock):
+                self.assertTrue(configure_loopback(compose, lock, runner, lock_held=True))
+            runner.assert_called_once()
+            self.assertIn('127.0.0.1:8123:8123', compose.read_text())
+
+    def test_broker_waits_for_running_container_and_rejects_published_descriptor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); matrix = root / 'controller-router'; matrix.mkdir()
+            (matrix / '.cache').mkdir(); (matrix / '.cache/app-compose.yaml').write_text('services:\n  main:\n    image: test\n')
+            (matrix / 'app.yaml').write_text('name: Matrix\n')
+            with patch.object(broker, 'ROOT', root), patch.object(broker, 'MATRIX_STATE', root / 'state'), \
+                 patch.object(broker.subprocess, 'run') as run, patch.object(broker, 'configure_loopback', return_value=True) as apply:
+                run.return_value = subprocess.CompletedProcess([], 0, stdout='false\n')
+                self.assertFalse(broker.ensure_matrix_port())
+                apply.assert_not_called()
+                run.side_effect = [subprocess.CompletedProcess([], 0, stdout='true\n'),
+                                   subprocess.CompletedProcess([], 0, stdout='null\n')]
+                self.assertTrue(broker.ensure_matrix_port())
+                apply.assert_called_once()
+                self.assertTrue(apply.call_args.kwargs["lock_held"])
+                (matrix / 'app.yaml').write_text('name: Matrix\nports:\n  - 8123\n')
+                with self.assertRaisesRegex(RuntimeError, 'must not publish'):
+                    broker.ensure_matrix_port()
+
+    def test_broker_leaves_healthy_loopback_binding_untouched(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); matrix = root / 'controller-router'; matrix.mkdir()
+            (matrix / '.cache').mkdir(); (matrix / '.cache/app-compose.yaml').write_text('services:\n  main:\n    image: test\n')
+            (matrix / 'app.yaml').write_text('name: Matrix\n')
+            with patch.object(broker, 'ROOT', root), patch.object(broker, 'MATRIX_STATE', root / 'state'), \
+                 patch.object(broker.subprocess, 'run') as run, patch.object(broker, 'configure_loopback') as apply:
+                run.side_effect = [subprocess.CompletedProcess([], 0, stdout='true\n'),
+                                   subprocess.CompletedProcess([], 0, stdout='[{"HostIp":"127.0.0.1","HostPort":"8123"}]')]
+                self.assertFalse(broker.ensure_matrix_port())
+                apply.assert_not_called()
+
+
+
+    def test_missing_ports_are_recreated_after_interrupted_prior_recreation(self):
+        from uno_portal.host.matrix_port import configure_loopback
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); compose = root / 'app-compose.yaml'
+            compose.write_text('services:\n  main:\n    ports:\n      - "127.0.0.1:8123:8123"\n')
+            runner = unittest.mock.Mock()
+            self.assertTrue(configure_loopback(compose, root / 'data/port.lock', runner, force=True))
+            runner.assert_called_once()
+
+    def test_inline_empty_ports_are_restricted_and_duplicates_rejected(self):
+        source = 'services:\n  main:\n    ports: []\n    image: test\n'
+        modified, changed = portal_install._matrix_loopback_compose(source)
+        self.assertTrue(changed)
+        self.assertIn('127.0.0.1:8123:8123', modified)
+        with self.assertRaisesRegex(RuntimeError, 'Duplicate Matrix ports'):
+            portal_install._matrix_loopback_compose(source + '    ports:\n      - 8123:8123\n')
+
+    def test_restart_rechecks_game_state_after_lock_and_defers(self):
+        from uno_portal.host.matrix_port import configure_loopback
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); compose = root / 'app-compose.yaml'
+            source = 'services:\n  main:\n    image: test\n'; compose.write_text(source)
+            runner = unittest.mock.Mock()
+            self.assertFalse(configure_loopback(compose, root / 'state/port.lock', runner,
+                                                safe_to_restart=lambda: False))
+            self.assertEqual(compose.read_text(), source)
+            runner.assert_not_called()
+
+    def test_uncertain_installed_product_game_state_fails_safe(self):
+        from unittest.mock import MagicMock
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / 'rob-vision'; app.mkdir(); (app / 'app.yaml').write_text('name: test')
+            apps = {'rob_vision': {'path': app, 'url': 'http://example.test'}}
+            response = MagicMock(); response.__enter__.return_value = response
+            with patch.object(broker, 'APPS', apps), patch.object(broker, 'urlopen') as request:
+                request.side_effect = OSError('offline')
+                self.assertTrue(broker.matrix_recreation_unsafe())
+                request.side_effect = None; request.return_value = response
+                for payload, expected in ((b'{}', True), (b'[]', True), (b'{"live_game_active":true}', True),
+                                          (b'{"live_game_active":false}', False)):
+                    response.read.return_value = payload
+                    self.assertEqual(broker.matrix_recreation_unsafe(), expected)
+
+    def test_watchdog_defers_active_game_and_retries_failure(self):
+        game = unittest.mock.Mock(side_effect=[True, False, False])
+        with patch.object(broker, 'ensure_matrix_port', side_effect=[RuntimeError('retry'), None]) as ensure, \
+             isolated_sleep(broker, side_effect=[None, None, StopIteration]), \
+             patch('builtins.print') as report:
+            with self.assertRaises(StopIteration):
+                broker.reconcile_matrix_port(game)
+        self.assertEqual(ensure.call_count, 2)
+        report.assert_called_once()
+
+
+class CommandDiagnosticTests(unittest.TestCase):
+    def test_failure_keeps_both_streams_and_redacts_sensitive_values(self):
+        result = subprocess.CompletedProcess(['arduino-app-cli'], 1,
+            stdout='OpenOCD: unable to open GPIO line 38\npassword=do-not-print\nprivate-unlabelled-output\n',
+            stderr='Upload port watcher closed\nAuthorization: Bearer do-not-print\n')
+        with patch.object(portal_install.subprocess, 'run', return_value=result):
+            with self.assertRaises(RuntimeError) as failure:
+                portal_install.command('arduino-app-cli', 'app', 'start')
+        message = str(failure.exception)
+        self.assertIn('stdout: OpenOCD: unable to open GPIO line 38', message)
+        self.assertIn('stderr: Upload port watcher closed', message)
+        self.assertNotIn('do-not-print', message)
+        self.assertNotIn('private-unlabelled-output', message)
+        self.assertIn('[sensitive diagnostic redacted]', message)
+
+    def test_failure_redacts_private_keys_urls_and_unlabelled_tokens(self):
+        payload = ('-----BEGIN PRIVATE KEY-----\nprivate-material\n-----END PRIVATE KEY-----\n'
+                   'https://alice:hunter2@example.test\n' + 'A' * 40)
+        result = subprocess.CompletedProcess(['tool'], 1, stdout='', stderr=payload)
+        with patch.object(portal_install.subprocess, 'run', return_value=result):
+            with self.assertRaises(RuntimeError) as failure:
+                portal_install.command('tool', 'sensitive-argument')
+        message = str(failure.exception)
+        for secret in ('private-material', 'hunter2', 'A' * 40, 'sensitive-argument'):
+            self.assertNotIn(secret, message)
+
+
 class PortTests(unittest.TestCase):
     def test_entry_start_waits_for_router_api_without_recreating_a_healthy_page(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -460,11 +760,69 @@ class InstallerTests(unittest.TestCase):
             cached = '{"name":"virtualglove","services":{"main":{"volumes":[]}},"networks":{"default":{"name":"virtualglove_default"}}}'
             with patch.object(products, "ROOT", root), \
                  patch.object(products, "RUNTIME", root / "runtime"), \
+                 patch.object(products, "SOCKET_DIR", root / "socket"), \
                  patch.object(products.subprocess, "run") as run:
                 run.return_value.stdout = cached
                 output = products.product_compose("virtualglove")
             self.assertEqual(loads(output.read_text())["networks"]["default"]["name"],
                              "virtualglove-runtime_default")
+
+    def test_matrix_upgrade_holds_watchdog_lock_through_swap_start_and_failure(self):
+        import fcntl
+        import os
+        from uno_portal.host import secure_pairing
+
+        for fail in (False, True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory); source = root / 'source'; (source / 'host').mkdir(parents=True)
+                for name in ('controller-router-portal.service', 'controller-router-products.service'):
+                    (source / 'host' / name).write_text('unit')
+                (source / 'VERSION').write_text('0.3.3')
+                state = root / 'state'; lock = state / '.matrix-port.lock'
+                apps = {'rob_vision': {'name': 'R.O.B. Vision', 'path': root / 'rob-vision'}}
+                def locked():
+                    with lock.open('r+') as handle:
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                def swap():
+                    locked()
+                    return None, True
+                def start(*, lock_held):
+                    self.assertTrue(lock_held)
+                    locked()
+                    if fail:
+                        raise RuntimeError('controlled start failure')
+                response = unittest.mock.MagicMock(); response.__enter__.return_value.status = 200
+                from contextlib import ExitStack
+                patches = [
+                    patch.object(portal_install, 'SOURCE', source),
+                    patch.object(portal_install, 'DEST', root / 'portal'),
+                    patch.object(portal_install, 'LEGACY', root / 'legacy'),
+                    patch.object(portal_install, 'SERVICE', root / 'units/portal.service'),
+                    patch.object(portal_install, 'PRODUCT_SERVICE', root / 'units/products.service'),
+                    patch.object(portal_install, 'MATRIX_STATE', state),
+                    patch.object(portal_install, 'MATRIX', root / 'matrix'),
+                    patch.object(portal_install, 'APPS', apps),
+                    patch.object(portal_install.os, 'geteuid', return_value=1000),
+                    patch.object(portal_install, 'validate_package'),
+                    patch.object(portal_install, 'app_listing', return_value={}),
+                    patch.object(portal_install, 'command', side_effect=lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout='{}')),
+                    patch.object(secure_pairing, 'certificates'),
+                    patch.object(portal_install, 'install_matrix_app', side_effect=swap),
+                    patch.object(portal_install, 'start_shared_matrix', side_effect=start),
+                    patch.object(portal_install, 'start_products'),
+                    patch.object(portal_install, 'urlopen', return_value=response),
+                    patch.object(portal_install, 'wait_secure_setup'),
+                    patch.object(portal_install, 'retire_early_start', side_effect=RuntimeError('finished'))
+                ]
+                with ExitStack() as stack:
+                    for item in patches:
+                        stack.enter_context(item)
+                    with self.assertRaisesRegex(RuntimeError, 'controlled start failure' if fail else 'finished'):
+                        portal_install.install()
+                with lock.open('r+') as handle:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def test_older_bundle_never_downgrades_shared_launcher(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -484,6 +842,22 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(command.call_args_list[0].args,
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
+
+    def test_032_bundle_preserves_033_portal_and_matrix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'old'; installed = root / 'current'
+            source.mkdir(); installed.mkdir(); (source / 'VERSION').write_text('0.3.2\n')
+            (installed / 'VERSION').write_text((portal_install.SOURCE / 'VERSION').read_text())
+            self.assertEqual((installed / 'VERSION').read_text().strip(), '0.3.3')
+            sentinel = installed / 'preserved'; sentinel.write_text('sentinel')
+            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                 patch.object(portal_install, 'LEGACY', root / 'legacy'), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, 'command'), patch.object(portal_install, 'validate_package') as validate, \
+                 patch.object(portal_install, 'install_matrix_app') as matrix:
+                self.assertIn('newer', portal_install.install())
+                validate.assert_not_called(); matrix.assert_not_called()
+            self.assertEqual(sentinel.read_text(), 'sentinel')
 
     def test_previous_stable_product_cannot_replace_prepared_runtime(self):
         current = (portal_install.SOURCE / 'VERSION').read_text()

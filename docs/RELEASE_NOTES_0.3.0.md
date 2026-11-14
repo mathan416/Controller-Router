@@ -24,6 +24,10 @@ The Matrix app descriptor does not publish a port through App Lab. The installer
 
 The wheel requires Python 3.10 or newer. Source-based console support on Python 3.7 is covered by the scoped console CI job; this does not claim that the complete UNO Q host or wheel supports Python 3.7.
 
+## UNO Q boot ordering
+
+On boards with Arduino's one-shot bootloader writer, the root setup helper can install an ordering-only systemd drop-in so App Lab waits for that writer when both are queued during boot. It does not enable the writer, change its completion flag, serialize later manual uploads, or resolve independent flash errors. VirtualGlove root setup runs this helper; R.O.B.-only installation reports the separate administrator command. The original failed first boot overlapped both programmers, but its primary upload error was not retained. A separate flash-write timeout later recovered after a local reset and retry; a general fix for that timeout is not established.
+
 ## Validation and remaining acceptance
 
 The preceding source revision passed all 11 CI jobs across the three projects. Development deployment on the Raspberry Pi 4 RetroPie console verified merged control paths; the UNO Q entry-page recovery check completed in 15.7 seconds without restarting product or Matrix services. Those are scoped development results, not certification of the final downloadable packages or every platform.

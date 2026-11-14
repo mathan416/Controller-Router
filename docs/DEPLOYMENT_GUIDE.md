@@ -94,6 +94,16 @@ Router appends its temporary settings after existing appended files. RetroArch c
 
 During RetroPie installation or upgrade, Router backs up the FCEUmm and Nestopia core overrides and removes only `input_player1_joypad_index` through `input_player4_joypad_index` inside one recognised old Router block. Button bindings, hotkeys, unmarked indexes, and other settings remain. This migration is installer-only. Router never changes these files at receiver startup or game launch, and RetroPie configuration and profile files remain owned by `pi:pi`.
 
+## UNO Q App Lab first-boot ordering
+
+Some UNO Q images run an enabled `arduino-burn-bootloader-unoq.service` once to install the MCU bootloader. If App Lab starts its default Matrix app at the same time, the two programmers can contend for the local MCU. On a supported UNO Q with that installed oneshot service and the App Lab system service, run the bundled helper as root during product installation or upgrade:
+
+```sh
+sudo python3 -m router_shared.uno_boot_order
+```
+
+The helper creates an ordering-only systemd drop-in and reloads systemd; it does not restart either service or enable a disabled bootloader writer. The rule takes effect on the next start or boot. When both enabled units are in the same boot transaction, App Lab starts after the oneshot writer finishes. It does not serialize manual starts of the writer after App Lab is already running or resolve unrelated SWD or firmware errors. A R.O.B. Vision-only installation needs this explicit root step; run it from the installed R.O.B. Vision directory so Python can find its bundled Router package. If the relevant writer is absent, the helper leaves the system unchanged. A disabled writer remains disabled; if it is enabled later, the ordering rule is already present. Review any conflicting existing drop-in rather than overwriting it.
+
 ## Optional UNO Q runtime
 
 The port-80 chooser links to **Setup** for Players and Systems and to **Pair console** on HTTPS port 8444. Router owns the console registry and authenticated console management connection. Product adapters retain game actions and scoped app credentials. Assignment changes take effect on the next launch.

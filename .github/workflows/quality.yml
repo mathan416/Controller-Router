@@ -83,6 +83,7 @@ jobs:
           test_emulator_builder test_emulator_hosts test_emulator_registration
           test_emulator_setup test_loader_session test_native_exit_install
           test_native_exit_launch test_native_fallback test_passive_exit_watcher
+          test_uno_boot_order
 
   package:
     name: Standalone Python 3.10 package
@@ -115,7 +116,8 @@ jobs:
                       'retropie_native.py', 'retropie_daphne.py', 'pairing.py',
                       'pairing_console.py', 'computer_bridge.py', 'computer_launch.py',
                       'emulator_hosts.py', 'emulator_registration.py', 'emulator_setup.py',
-                      'loader_session.py', 'native_exit_launch.py', 'passive_exit_watcher.py', 'LICENSE'}
+                      'loader_session.py', 'native_exit_launch.py', 'passive_exit_watcher.py',
+                      'uno_boot_order.py', 'LICENSE'}
           with zipfile.ZipFile(wheel) as archive:
               names = set(archive.namelist())
               assert {'router_shared/' + name for name in required} <= names
@@ -137,7 +139,7 @@ jobs:
                        'retropie_daphne', 'pairing', 'pairing_console', 'computer_bridge',
                        'computer_launch', 'emulator_hosts', 'emulator_registration',
                        'emulator_setup', 'loader_session', 'native_exit_launch',
-                       'passive_exit_watcher'):
+                       'passive_exit_watcher', 'uno_boot_order'):
               importlib.import_module('router_shared.' + name)
           print('Isolated installed Router imports passed')
           PY_IMPORT

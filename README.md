@@ -10,10 +10,9 @@ VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consol
 - [Pairing Guide](docs/PAIRING_GUIDE.md): connect a console once and check each app's access.
 - [Integration Guide](docs/INTEGRATION_GUIDE.md): add an unusual controller or game.
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
-- [Optional Emulator Adapters](docs/EMULATOR_ADAPTERS.md): computer bridges and host-specific DICE/Flycast support.
+- [Optional Emulator Adapters](docs/EMULATOR_ADAPTERS.md): qualified computer bridges and host-specific DICE/Flycast support.
 - [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behaviour.
 - [0.3.0 release preparation](docs/RELEASE_NOTES_0.3.0.md): native host adapters, UNO Q recovery and validation limits.
-- [0.3.0 release notes](docs/RELEASE_NOTES_0.3.0.md): changes, validation and remaining release acceptance.
 - [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md): changes in the first stable shared release.
 
 The controller's **Help** page offers shorter, task-based instructions and links to the printable PDFs in [output/pdf](output/pdf/). The [documentation library](docs/README.md) is the complete reading map.

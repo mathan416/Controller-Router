@@ -48,4 +48,4 @@ Write each guide for one reader and one purpose. Player Help answers “what do 
 
 ## Next release
 
-[0.3.0 release preparation](RELEASE_NOTES_0.3.0.md) records the changes, independent UNO Q runtime version, and candidate acceptance still required. The published 0.2.0 notes remain historical release documentation.
+[0.3.0 release notes](RELEASE_NOTES_0.3.0.md) record the changes, independent UNO Q runtime version, and the scope of device validation. The 0.2.0 notes remain historical release documentation.

@@ -1,8 +1,15 @@
 # Controller Router
 
-Controller Router puts each gamepad with the player you choose. It combines configured physical and maker-controller inputs into stable Players 1–4 for RetroArch, while keeping EmulationStation button mappings. You can use it for NES alone, selected Libretro systems, or all supported Libretro systems. **My existing setup** leaves a system's normal controls in place.
+Controller Router is a Linux input-routing library and optional UNO Q service for retro-gaming projects. It merges configured physical pads and authenticated maker-controller sources into stable Players 1–4 for selected RetroArch launches. It retains EmulationStation mappings and saved emulator settings. **My existing setup** selects the console's existing control path for a system.
 
-VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consoles and controller. Those installers install or upgrade Router; there is no separate player installation step. VirtualGlove's Windows LaunchBox path uses its own input integration. This checkout describes the current development version. A published product installer may contain an earlier Router version, so follow the guide included with that release.
+VirtualGlove and R.O.B. Vision bundle Router on their Linux consoles and share its UNO Q Matrix portal. Their installers supply the receiver and game-specific behavior; the Python wheel alone does not install a console service. VirtualGlove's Windows LaunchBox path has a separate input implementation. The stable library version is **0.3.0**; the independently versioned UNO Q portal is **0.3.3**.
+
+| Component | Function | Boundary |
+| --- | --- | --- |
+| Console router | Assigns source identities to players and provides merged gamepads during a routed launch | EmulationStation and saved RetroArch configuration remain the console's source of truth |
+| Native host adapters | Register supported non-Libretro launchers, including ArcEm, GSplus, and SimCoupe | Emulator patches and saved-setting fallbacks are installed by the host product |
+| UNO Q portal | Owns the Apps chooser, console pairing, input leases, and shared 13×8 Matrix display | Product services remain independent; only the selected app receives a live input lease |
+| Product receiver | Converts a project's camera, frame, or other signal into a Router source | Game profiles, ROM names, and actions belong to that product |
 
 ## Get started
 
@@ -12,7 +19,7 @@ VirtualGlove and R.O.B. Vision bundle this shared project for their Linux consol
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
 - [Optional Emulator Adapters](docs/EMULATOR_ADAPTERS.md): qualified computer bridges and host-specific DICE/Flycast support.
 - [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behaviour.
-- [0.3.0 release preparation](docs/RELEASE_NOTES_0.3.0.md): native host adapters, UNO Q recovery and validation limits.
+- [0.3.0 release notes](docs/RELEASE_NOTES_0.3.0.md): native host adapters, UNO Q recovery and validation scope.
 - [0.2.0 release notes](docs/RELEASE_NOTES_0.2.0.md): changes in the first stable shared release.
 
 The controller's **Help** page offers shorter, task-based instructions and links to the printable PDFs in [output/pdf](output/pdf/). The [documentation library](docs/README.md) is the complete reading map.
@@ -52,15 +59,15 @@ The descriptor identifies controls; it does not create the device or select a pl
 
 ## Develop and validate
 
-Edit shared code here, then sync both product bundles:
+Edit shared code here, then sync both product bundles before packaging:
 
 ```sh
 python3 -m unittest discover -s tests
-python3 scripts/sync.py --virtualglove /path/to/PowerGlove
-python3 scripts/sync.py --virtualglove /path/to/PowerGlove --check
+python3 scripts/sync.py --virtualglove /path/to/VirtualGlove
+python3 scripts/sync.py --virtualglove /path/to/VirtualGlove --check
 ```
 
-The library has no ROM or network dependency. Live console routing requires Linux uinput, udev, and RetroArch. See the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for product packaging and the [Technical Reference](docs/TECHNICAL_REFERENCE.md) for its security and runtime contracts.
+The library has no ROM or network dependency. Live console routing requires Linux uinput, udev, and RetroArch. A wheel install does not create virtual devices or pair a console. See the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for product packaging and the [Technical Reference](docs/TECHNICAL_REFERENCE.md) for its security and runtime contracts.
 
 Native RetroPie host adapters and nested ports are included in the shared source build. The UNO Q Setup catalogue supports explicitly registered native/custom launchers, and native sessions block assignment edits. Existing host configuration and original emulator fallbacks remain installed separately. See [Integration Guide](docs/INTEGRATION_GUIDE.md#native-retropie-host-adapters).
 

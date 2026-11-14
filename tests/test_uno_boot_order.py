@@ -76,6 +76,22 @@ class UnitOrderTests(unittest.TestCase):
         self.assertEqual(self.target().read_bytes(), mod.CONTENT)
         self.assertEqual(sum('daemon-reload' in c for c in self.commands), 1)
 
+    def test_previous_known_dropin_is_retained_when_effective(self):
+        self.target().parent.mkdir()
+        self.target().write_bytes(mod.PREVIOUS_CONTENT)
+        self.assertIn('already installed and effective', mod.install(self.root, self.run_command))
+        self.assertEqual(self.target().read_bytes(), mod.PREVIOUS_CONTENT)
+        self.assertFalse(any('daemon-reload' in command for command in self.commands))
+
+    def test_previous_known_dropin_reloads_when_needed(self):
+        self.target().parent.mkdir()
+        self.target().write_bytes(mod.PREVIOUS_CONTENT)
+        self.after_fields = 'network-online.target\n'
+        self.reload_restores_after = True
+        self.assertIn('effective', mod.install(self.root, self.run_command))
+        self.assertEqual(self.target().read_bytes(), mod.PREVIOUS_CONTENT)
+        self.assertEqual(sum('daemon-reload' in c for c in self.commands), 1)
+
     def test_existing_dropin_ineffective_is_retained(self):
         self.target().parent.mkdir()
         self.target().write_bytes(mod.CONTENT)

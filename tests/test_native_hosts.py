@@ -66,6 +66,42 @@ class NativeHostTests(unittest.TestCase):
         self.assertEqual(original,{'hat_x':1});self.assertEqual(buttons,{'a'})
         self.assertEqual(transform_controls(buttons,original,'libretro','nes',manifest),({'a'},{'hat_x':1}))
 
+    def test_router_rescans_processes_only_when_they_change(self):
+        proc=self.root/'proc';proc.mkdir();(proc/'100').mkdir();(proc/'self').mkdir()
+        device=router.ControllerRouterDevice.__new__(router.ControllerRouterDevice)
+        device.proc_root=proc;device.session_context=(None,None)
+        device.session_checked_at=device.session_scanned_at=0.0;device.session_pids=None
+        step,full=router.SESSION_CHECK_SECONDS,router.SESSION_FULL_SCAN_SECONDS
+        with patch.object(router,'running_game_session',return_value=(None,None)) as scan:
+            device._game_session(100.0);self.assertEqual(scan.call_count,1)
+            device._game_session(100.0+step/2);device._game_session(100.0+step)
+            self.assertEqual(scan.call_count,1)           # same processes: no rescan
+            (proc/'200').mkdir();scan.return_value=('fceumm_libretro.so','nes')
+            self.assertEqual(device._game_session(100.0+2*step),('fceumm_libretro.so','nes'))
+            self.assertEqual(scan.call_count,2)           # a game started
+            scan.return_value=('nestopia_libretro.so','nes')
+            device._game_session(100.0+3*step);self.assertEqual(scan.call_count,2)
+            self.assertEqual(device._game_session(100.0+2*step+full),('nestopia_libretro.so','nes'))
+            self.assertEqual(scan.call_count,3)           # periodic scan catches exec in place
+            (proc/'200').rmdir();scan.return_value=(None,None)
+            self.assertEqual(device._game_session(100.0+3*step+full),(None,None))
+            self.assertEqual(scan.call_count,4)           # the game exited
+        self.assertLessEqual(step,2.0);self.assertLessEqual(full,10.0)  # start/exit stay prompt
+        self.assertEqual(router.process_ids(proc),frozenset({'100'}))
+        self.assertIsNone(router.process_ids(self.root/'missing'))
+
+    def test_every_installed_provider_stays_loaded(self):
+        from router_shared import native_sessions
+        paths=[]
+        for name in ('first','second','third'):
+            path=self.root/(name+'-host.py');path.write_text('LOADS=globals().get("LOADS",0)+1\nNAME=%r\n'%name);paths.append(path)
+        modules=[native_sessions.load_provider(path) for path in paths]
+        self.assertEqual([native_sessions.load_provider(path) for path in paths],modules)  # no re-import
+        self.assertEqual([module.NAME for module in modules],['first','second','third'])
+        os.utime(paths[0],ns=(1,1))
+        self.assertIsNot(native_sessions.load_provider(paths[0]),modules[0])  # edited file reloads
+        self.assertIs(native_sessions.load_provider(paths[1]),modules[1])
+
     def test_native_game_blocks_output_recreation_on_service_restart(self):
         config={'platform':'retropie','players':[],'virtualglove_player':None}
         with patch.object(router,'load_config',return_value=config),patch.object(router,'running_game_session',return_value=('native-merged','n64')),patch.object(router,'UInputMergedGamepad') as sink:

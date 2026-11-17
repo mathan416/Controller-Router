@@ -148,6 +148,40 @@ class SharedPairingFlowTests(unittest.TestCase):
         self.assertFalse(self.store.connection)
         self.assertFalse(self.manager.inspect()['consoles'])
 
+    def test_browser_remove_and_access_need_matrix_code(self):
+        self.pair();identity=self.store.console_id
+        start=self.manager.operation({'operation':'remove','id':identity})
+        self.assertIn('session',start)
+        self.assertTrue(self.manager.inspect()['consoles'])
+        self.assertTrue(self.store.connection)
+        with self.assertRaises(ValueError):self.manager.confirm(start['session'],'000000' if self.matrix.pin!='000000' else '111111')
+        self.assertTrue(self.manager.inspect()['consoles'])
+        self.manager.operation({'operation':'confirm','session':start['session'],'pin':self.matrix.pin})
+        self.assertFalse(self.manager.inspect()['consoles'])
+        self.assertFalse(self.store.connection)
+
+    def test_browser_access_change_applies_only_after_confirmation(self):
+        self.pair();identity=self.store.console_id
+        start=self.manager.operation({'operation':'access','id':identity,'app':'rob_vision','enabled':False})
+        self.assertIn('rob_vision',self.store.connection['apps'])
+        with self.assertRaises(ValueError):
+            self.manager.operation({'operation':'remove','id':identity})  # one window at a time
+        self.manager.confirm(start['session'],self.matrix.pin)
+        self.assertNotIn('rob_vision',self.store.connection['apps'])
+        self.assertIn('virtualglove',self.store.connection['apps'])
+
+    def test_change_requests_are_validated_and_lock_out(self):
+        self.pair();identity=self.store.console_id
+        for payload in ({'operation':'remove','id':'f'*32},
+                        {'operation':'access','id':identity,'app':'unknown','enabled':False},
+                        {'operation':'access','id':identity,'app':'rob_vision','enabled':'no'}):
+            with self.assertRaises(ValueError):self.manager.operation(payload)
+        session=self.manager.operation({'operation':'remove','id':identity})['session']
+        for _ in range(5):
+            with self.assertRaises(ValueError):self.manager.confirm(session,'wrong')
+        with self.assertRaises(ValueError):self.manager.operation({'operation':'remove','id':identity})
+        self.assertTrue(self.store.connection)
+
     def test_legacy_aliases_use_identity_and_both_credentials(self):
         tokens = {'virtualglove': 'existing-glove-credential', 'rob_vision': 'existing-buddy-credential'}
         for app, token in tokens.items():

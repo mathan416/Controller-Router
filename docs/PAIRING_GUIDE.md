@@ -60,7 +60,7 @@ Return to **Pair console > Your consoles** whenever you need to check a link:
 
 - **Unavailable** means Router could not reach the console. Check that it is on and on the same network, then choose **Check and repair connections**.
 - **Needs attention** means the console identity, certificate, or app setup needs review. Check the message, then repair or pair again as directed.
-- **Disable** turns off one app's access while keeping the console linked. **Enable** restores it. **Remove** deletes the console connection and its app access.
+- **Disable** turns off one app's access while keeping the console linked. **Enable** restores it. **Remove** deletes the console connection and its app access. Each of these changes shows a new code on the Matrix display; enter the six digits after **PN** and choose **Confirm**, just as you did when pairing. Nothing changes until the code is confirmed.
 
 Finish any game before changing access or removing a console. To add another console, run its pairing command and repeat the steps above. Existing game filenames and player assignments stay saved.
 

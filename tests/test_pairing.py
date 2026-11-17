@@ -76,6 +76,20 @@ class ConsolePairingTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.store.adopt(request)
         self.assertNotIn('existing-legacy-secret', json.dumps(proof))
 
+    def test_legacy_proof_endpoint_cannot_sign_an_adopt_transcript(self):
+        self.token.write_text('existing-legacy-secret')
+        nonce = 'a' * 16
+        self.store.proof('virtualglove', nonce, 'b' * 64)
+        document = {'token': 'A' * 32, 'uno_id': 'a' * 32, 'uno_url': 'http://a'}
+        transcript = json.dumps(document, sort_keys=True, separators=(',', ':'))
+        with self.assertRaises(ValueError):
+            self.store.proof('virtualglove', nonce + '\n' + transcript, 'b' * 64)
+        for bad in ('A' * 32, 'g' * 32, 'a' * 15, 'a' * 129, 'a' * 16 + '\n'):
+            with self.assertRaises(ValueError):
+                self.store.proof('virtualglove', bad, 'b' * 64)
+        self.assertFalse(self.store.connection)
+        self.assertEqual(self.token.read_text(), 'existing-legacy-secret')
+
     def test_tampered_migration_keeps_old_connection(self):
         self.token.write_text('existing-legacy-secret')
         nonce = 'a' * 32

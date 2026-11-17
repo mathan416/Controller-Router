@@ -71,24 +71,70 @@ class NativeHostTests(unittest.TestCase):
         device=router.ControllerRouterDevice.__new__(router.ControllerRouterDevice)
         device.proc_root=proc;device.session_context=(None,None)
         device.session_checked_at=device.session_scanned_at=0.0;device.session_pids=None
+        device.session_recheck=False
         step,full=router.SESSION_CHECK_SECONDS,router.SESSION_FULL_SCAN_SECONDS
         with patch.object(router,'running_game_session',return_value=(None,None)) as scan:
             device._game_session(100.0);self.assertEqual(scan.call_count,1)
-            device._game_session(100.0+step/2);device._game_session(100.0+step)
-            self.assertEqual(scan.call_count,1)           # same processes: no rescan
-            (proc/'200').mkdir();scan.return_value=('fceumm_libretro.so','nes')
-            self.assertEqual(device._game_session(100.0+2*step),('fceumm_libretro.so','nes'))
-            self.assertEqual(scan.call_count,2)           # a game started
+            device._game_session(100.0+step);self.assertEqual(scan.call_count,2)  # follow-up after first scan
+            device._game_session(100.0+1.5*step);device._game_session(100.0+2*step)
+            self.assertEqual(scan.call_count,2)           # same processes: no rescan
+            (proc/'200').mkdir()                          # launcher starts as a shell...
+            device._game_session(100.0+3*step);self.assertEqual(scan.call_count,3)
+            scan.return_value=('fceumm_libretro.so','nes')  # ...then execs into the emulator
+            self.assertEqual(device._game_session(100.0+4*step),('fceumm_libretro.so','nes'))
+            self.assertEqual(scan.call_count,4)           # follow-up check catches it
+            device._game_session(100.0+5*step);self.assertEqual(scan.call_count,4)
             scan.return_value=('nestopia_libretro.so','nes')
-            device._game_session(100.0+3*step);self.assertEqual(scan.call_count,2)
-            self.assertEqual(device._game_session(100.0+2*step+full),('nestopia_libretro.so','nes'))
-            self.assertEqual(scan.call_count,3)           # periodic scan catches exec in place
+            self.assertEqual(device._game_session(100.0+4*step+full),('nestopia_libretro.so','nes'))
+            self.assertEqual(scan.call_count,5)           # periodic safety scan
             (proc/'200').rmdir();scan.return_value=(None,None)
-            self.assertEqual(device._game_session(100.0+3*step+full),(None,None))
-            self.assertEqual(scan.call_count,4)           # the game exited
-        self.assertLessEqual(step,2.0);self.assertLessEqual(full,10.0)  # start/exit stay prompt
+            self.assertEqual(device._game_session(100.0+5*step+full),(None,None))
+            self.assertEqual(scan.call_count,6)           # the game exited
+        self.assertLessEqual(step,2.0);self.assertLessEqual(full,30.0)  # start/exit stay prompt
         self.assertEqual(router.process_ids(proc),frozenset({'100'}))
         self.assertIsNone(router.process_ids(self.root/'missing'))
+
+    def test_input_signature_tracks_hotplug_replug_and_mapping_edits(self):
+        sysfs=self.root/'sys';sysfs.mkdir();(sysfs/'event3').mkdir()
+        es=self.root/'es_input.cfg';es.write_text('<inputList/>')
+        with patch.dict(os.environ,{'CONTROLLER_ROUTER_SOURCES_FILE':''}):
+            first=router.input_signature(sysfs,es)
+            self.assertEqual(router.input_signature(sysfs,es),first)
+            (sysfs/'event4').mkdir();plugged=router.input_signature(sysfs,es)
+            self.assertNotEqual(plugged,first)                       # hotplug
+            (sysfs/'event4').rmdir();(sysfs/'spare').mkdir();(sysfs/'spare').rename(sysfs/'event4')
+            self.assertNotEqual(router.input_signature(sysfs,es),plugged)  # same name, new device
+            before=router.input_signature(sysfs,es);es.write_text('<inputList><inputConfig/></inputList>')
+            self.assertNotEqual(router.input_signature(sysfs,es),before)   # remapped in EmulationStation
+        self.assertIsNone(router.input_signature(self.root/'missing',es))
+
+    def test_discovery_and_index_checks_skip_unchanged_inputs(self):
+        device=router.ControllerRouterDevice.__new__(router.ControllerRouterDevice)
+        device.sys_root=self.root;device.es_inputs=self.root/'es_input.cfg'
+        for purpose in ('discovery','index'):
+            setattr(device,purpose+'_signature',None);setattr(device,purpose+'_refreshed_at',0.0)
+        device.discovery_forced=device.discovery_recheck=device.index_recheck=False
+        full=router.INPUT_FULL_REFRESH_SECONDS
+        with patch.object(router,'input_signature',return_value=('same',)) as signature:
+            self.assertTrue(device._input_changed('discovery',100.0))          # first check
+            self.assertTrue(device._input_changed('discovery',101.0))          # follow-up check
+            self.assertFalse(device._input_changed('discovery',102.0))         # nothing changed
+            self.assertTrue(device._input_changed('index',101.0))              # independent schedule
+            self.assertTrue(device._input_changed('index',102.0))
+            self.assertFalse(device._input_changed('index',103.0))
+            device.discovery_forced=True
+            self.assertTrue(device._input_changed('discovery',103.0))          # controller disconnected
+            self.assertFalse(device.discovery_forced)
+            self.assertFalse(device._input_changed('discovery',104.0))
+            signature.return_value=('changed',)
+            self.assertTrue(device._input_changed('discovery',104.5))          # device plugged in
+            self.assertTrue(device._input_changed('discovery',105.5))          # once more while it settles
+            self.assertFalse(device._input_changed('discovery',106.5))
+            self.assertTrue(device._input_changed('index',104.5))
+            self.assertTrue(device._input_changed('discovery',105.5+full))     # periodic full refresh
+            signature.return_value=None
+            self.assertTrue(device._input_changed('discovery',105.6+full))     # unreadable: always refresh
+        self.assertLessEqual(full,30.0)
 
     def test_every_installed_provider_stays_loaded(self):
         from router_shared import native_sessions

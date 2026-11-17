@@ -53,6 +53,62 @@ class ConsolePairingTests(unittest.TestCase):
         self.assertEqual(self.token.read_text(), 'old-secret')
         self.assertEqual(load_json(self.target)['uno_q'], 'old.local')
 
+    def test_restored_commit_failure_clears_journal_once(self):
+        tx = self.prepare()
+        calls = []
+        def restart(app, _descriptor):
+            calls.append(app)
+            if len(calls) == 1: raise OSError('startup failed')
+        self.store.restart = restart
+        with self.assertRaises(ValueError): self.store.commit(tx, self.payload['token'])
+        self.assertFalse((self.store.root / 'pending.json').exists())
+        self.assertEqual(self.token.read_text(), 'old-secret')
+        self.now = 300; self.store.expire()
+        self.assertEqual(calls, ['virtualglove', 'virtualglove'])  # no second restore on expiry
+
+    def test_buddy_must_stay_on_player_two_for_save_and_rollback(self):
+        from router_shared.pairing_console import check_buddy
+        buddy = {'name': 'R.O.B. Vision Controller 2'}
+        def config(player): return {'players': [{'player': player, 'sources': [buddy]}]}
+        backup = self.root / 'router.json.previous'
+        class Router:
+            def __init__(self, proposed): self.proposed, self.backup = proposed, backup
+            def _materialize(self, _config): return self.proposed
+        with self.assertRaisesRegex(ValueError, 'Player 2'):
+            check_buddy(Router(config(1)), 'save', {}, True)
+        check_buddy(Router(config(2)), 'save', {}, True)
+        check_buddy(Router(config(1)), 'save', {}, False)  # R.O.B. Vision not paired
+        check_buddy(Router(None), 'rollback', None, True)   # no backup: operate() reports it
+        from unittest import mock
+        with mock.patch('router_shared.controller_router.load_config', return_value=config(1)):
+            backup.write_text('{}')
+            with self.assertRaisesRegex(ValueError, 'Player 2'):
+                check_buddy(Router(None), 'rollback', None, True)
+        with mock.patch('router_shared.controller_router.load_config', return_value=config(2)):
+            check_buddy(Router(None), 'rollback', None, True)
+        check_buddy(Router(None), 'check', None, True)
+
+    def test_env_and_text_adapters_use_descriptor_key_and_port(self):
+        url = 'http://uno.local'
+        env = self.root / 'receiver.env'
+        cases = (({'kind': 'env'}, 'A=1\nROB_VISION_URL=old\n', 'A=1\nROB_VISION_URL=http://uno.local:8766\n'),
+                 ({'kind': 'env', 'target_key': 'GLOVE_URL', 'port': 9000}, 'GLOVE_URL=old\nROB_VISION_URL=keep\n',
+                  'GLOVE_URL=http://uno.local:9000\nROB_VISION_URL=keep\n'),
+                 ({'kind': 'text'}, '', 'http://uno.local:8766\n'),
+                 ({'kind': 'text', 'port': 8101}, '', 'http://uno.local:8101\n'))
+        for extra, before, after in cases:
+            with self.subTest(extra=extra):
+                env.write_text(before)
+                self.store.register('rob_vision', {**extra, 'token_file': str(self.root / 'buddy.token'),
+                                                   'target_file': str(env)})
+                self.store._apply('rob_vision', {'token': secret(), 'console_id': '3' * 32}, url)
+                self.assertEqual(env.read_text(), after)
+        for bad in ({'kind': 'text', 'port': 0}, {'kind': 'text', 'port': '8766'},
+                    {'kind': 'env', 'target_key': 'X=1\nY'}, {'kind': 'env', 'target_key': 'lower'}):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.store.register('rob_vision', {**bad, 'token_file': str(self.root / 'buddy.token'),
+                                                   'target_file': str(env)})
+
     def test_expiry_rolls_back_and_game_blocks(self):
         self.prepare(); self.now = 300; self.store.expire()
         self.assertFalse((self.store.root / 'pending.json').exists())

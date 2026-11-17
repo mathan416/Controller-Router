@@ -208,6 +208,34 @@ class SharedPairingFlowTests(unittest.TestCase):
         self.manager.confirm(start['session'],self.matrix.pin)
         self.assertTrue(self.manager.inspect()['consoles'])
 
+    def test_reads_do_not_wait_for_reconcile_lock(self):
+        import threading
+        self.pair()
+        held, release = threading.Event(), threading.Event()
+        def hold():
+            with self.manager.lock:
+                held.set(); release.wait(5)
+        worker = threading.Thread(target=hold); worker.start(); held.wait(5)
+        try:
+            self.assertEqual(len(self.manager.inspect()['consoles']), 1)
+            self.assertEqual(len(self.manager.routing({'operation':'targets'})['targets']), 1)
+        finally:
+            release.set(); worker.join()
+
+    def test_router_check_waits_for_console_input_test(self):
+        self.pair();identity=self.store.console_id
+        seen = {}
+        class Peer:
+            def __init__(peer, host, pin=None): pass
+            def request(peer, path, payload=None, token=None, timeout=10):
+                seen.update(payload=payload, timeout=timeout); return {}
+        self.manager.peer = Peer
+        self.manager.routing({'operation':'check','console_id':identity,'watch_ms':10000})
+        self.assertEqual(seen['payload']['watch_ms'], 10000)
+        self.assertGreaterEqual(seen['timeout'], 20)
+        self.manager.routing({'operation':'read','console_id':identity})
+        self.assertEqual(seen['timeout'], 10)
+
     def test_legacy_aliases_use_identity_and_both_credentials(self):
         tokens = {'virtualglove': 'existing-glove-credential', 'rob_vision': 'existing-buddy-credential'}
         for app, token in tokens.items():

@@ -34,7 +34,13 @@ def main() -> int:
     if not args.check:
         shared.mkdir(exist_ok=True)
         (shared / '__init__.py').touch()
-        for name in ('pairing.py', 'pairing_console.py'):
+    for name in ('pairing.py', 'pairing_console.py'):
+        # The portal carries its own copy; check it against the library source too,
+        # not only against the app copies that were made from it.
+        if args.check:
+            if not (shared / name).is_file() or not filecmp.cmp(ROOT / 'router_shared' / name, shared / name, shallow=False):
+                drift.append(str(shared / name))
+        else:
             shutil.copy2(ROOT / 'router_shared' / name, shared / name)
     for target in targets:
         if not args.check:

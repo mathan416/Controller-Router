@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "maker-controller-router"
-version = "0.3.1"
+version = "0.3.2"
 description = "Shared Linux controller routing for maker projects"
 requires-python = ">=3.10"
 license = {text = "MIT for Router code; separately licensed emulator patches, see included COPYING files"}

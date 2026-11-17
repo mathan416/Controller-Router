@@ -130,6 +130,50 @@ class LeaseTests(unittest.TestCase):
             for app in apps.values():
                 self.assertFalse(lease_active(app["path"] / "data/controller-router-lease.json"))
 
+    def _launcher(self, root):
+        apps = {key: {"path": root / key, "url": "http://unused", "port": port}
+                for key, port in (("virtualglove", 8100), ("rob_vision", 8101))}
+        for app in apps.values():
+            (app["path"] / "data").mkdir(parents=True)
+        matrix = MatrixScheduler(send=lambda rows: True)
+        with patch.object(ConcurrentLauncher, "_heartbeat", return_value=None), \
+             patch.object(matrix, "run", return_value=None):
+            return apps, ConcurrentLauncher(apps=apps, matrix=matrix)
+
+    def test_app_folder_replaced_during_lease_write_is_retried_quietly(self):
+        import os as real_os
+        with tempfile.TemporaryDirectory() as directory:
+            apps, launcher = self._launcher(Path(directory))
+            data = apps["virtualglove"]["path"] / "data"
+            real_replace = real_os.replace
+            def swapped(source, target):
+                if "virtualglove" in str(target):
+                    raise FileNotFoundError(2, "No such file or directory", source)
+                return real_replace(source, target)
+            with patch("uno_portal.host.concurrent.os.replace", side_effect=swapped):
+                launcher._write_leases("rob_vision")          # no exception escapes
+            self.assertEqual([p.name for p in data.iterdir() if p.name.endswith(".tmp")], [])
+            self.assertTrue(lease_active(apps["rob_vision"]["path"] / "data/controller-router-lease.json"))
+            with patch("uno_portal.host.concurrent.tempfile.mkstemp",
+                       side_effect=FileNotFoundError(2, "No such file or directory")):
+                launcher._write_leases(None)                  # folder gone mid-install
+            launcher._write_leases(None)
+            self.assertFalse(lease_active(data / "controller-router-lease.json"))
+            self.assertEqual(oct((data / "controller-router-lease.json").stat().st_mode & 0o777), "0o600")
+
+    def test_heartbeat_error_clears_after_next_good_beat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            _, launcher = self._launcher(Path(directory))
+            with patch.object(launcher, "_reconcile_games", return_value=None):
+                with patch.object(launcher, "_write_leases", side_effect=PermissionError("denied")):
+                    launcher._beat()
+                self.assertEqual(launcher.error, "denied")
+                launcher._beat()
+                self.assertEqual(launcher.error, "")          # recovered: stale message cleared
+                launcher.error = "More than one controller reports a live game; end one game."
+                launcher._beat()
+                self.assertIn("More than one", launcher.error)  # other errors are left alone
+
     def test_background_game_still_locks_selection(self):
         launcher = object.__new__(ConcurrentLauncher)
         launcher.apps = {

@@ -1087,14 +1087,14 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
-    def test_older_bundles_preserve_034_portal_and_matrix(self):
-        # 0.3.3 is the last runtime without the Matrix-confirmed console changes.
-        for older in ('0.3.2', '0.3.3'):
+    def test_older_bundles_preserve_035_portal_and_matrix(self):
+        # 0.3.3 lacks the Matrix-confirmed console changes; 0.3.4 lacks the lease fix.
+        for older in ('0.3.2', '0.3.3', '0.3.4'):
             with self.subTest(older=older), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory); source = root / 'old'; installed = root / 'current'
                 source.mkdir(); installed.mkdir(); (source / 'VERSION').write_text(older + '\n')
                 (installed / 'VERSION').write_text((portal_install.SOURCE / 'VERSION').read_text())
-                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.3.4')
+                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.3.5')
                 sentinel = installed / 'preserved'; sentinel.write_text('sentinel')
                 with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
                      patch.object(portal_install, 'LEGACY', root / 'legacy'), \

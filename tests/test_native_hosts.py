@@ -102,7 +102,9 @@ class NativeHostTests(unittest.TestCase):
             self.assertEqual(router.input_signature(sysfs,es),first)
             (sysfs/'event4').mkdir();plugged=router.input_signature(sysfs,es)
             self.assertNotEqual(plugged,first)                       # hotplug
-            (sysfs/'event4').rmdir();(sysfs/'spare').mkdir();(sysfs/'spare').rename(sysfs/'event4')
+            # Create the replacement before removing the original so no filesystem
+            # can hand the old inode number to the new entry.
+            (sysfs/'spare').mkdir();(sysfs/'event4').rmdir();(sysfs/'spare').rename(sysfs/'event4')
             self.assertNotEqual(router.input_signature(sysfs,es),plugged)  # same name, new device
             before=router.input_signature(sysfs,es);es.write_text('<inputList><inputConfig/></inputList>')
             self.assertNotEqual(router.input_signature(sysfs,es),before)   # remapped in EmulationStation

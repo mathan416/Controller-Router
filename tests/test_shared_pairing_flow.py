@@ -182,6 +182,32 @@ class SharedPairingFlowTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.manager.operation({'operation':'remove','id':identity})
         self.assertTrue(self.store.connection)
 
+    def test_other_browsers_cannot_end_a_confirmation(self):
+        start=self.begin()
+        with self.assertRaises(ValueError):self.manager.operation({'operation':'cancel'})
+        with self.assertRaises(ValueError):self.manager.operation({'operation':'cancel','session':'0'*32})
+        with self.assertRaises(ValueError):self.manager.confirm('0'*32,self.matrix.pin)
+        self.assertTrue(self.manager.inspect()['pairing'])
+        self.manager.confirm(start['session'],self.matrix.pin)
+        self.assertTrue(self.store.connection)
+
+    def test_cancel_with_own_session_and_game_start_close_window(self):
+        start=self.begin()
+        self.assertEqual(self.manager.operation({'operation':'cancel','session':start['session']}),{'cancelled':True})
+        self.assertFalse(self.manager.inspect()['pairing'])
+        self.begin();self.manager.close_window()
+        self.assertFalse(self.manager.inspect()['pairing'])
+
+    def test_pairing_replaces_unconfirmed_change_request(self):
+        self.pair();identity=self.store.console_id
+        self.manager.operation({'operation':'remove','id':identity})
+        write_json(self.store.root/'window.json',{'authorization':'ABCDEFGHIJKL','expires':1000})
+        start=self.begin()
+        self.assertNotIn('change',self.manager.window)
+        with self.assertRaises(ValueError):self.manager.operation({'operation':'remove','id':identity})
+        self.manager.confirm(start['session'],self.matrix.pin)
+        self.assertTrue(self.manager.inspect()['consoles'])
+
     def test_legacy_aliases_use_identity_and_both_credentials(self):
         tokens = {'virtualglove': 'existing-glove-credential', 'rob_vision': 'existing-buddy-credential'}
         for app, token in tokens.items():

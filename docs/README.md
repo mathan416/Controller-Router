@@ -8,6 +8,7 @@ Use Canadian English in project-authored documentation, Help, website copy, and 
 - [Deployment Guide](DEPLOYMENT_GUIDE.md): package the console library, optional UNO Q runtime, upgrades, and recovery.
 - [Technical Reference](TECHNICAL_REFERENCE.md): architecture, API examples, leases, Matrix protocol, storage, and extension boundaries.
 - [Optional Emulator Adapters](EMULATOR_ADAPTERS.md): computer bridges, native fallbacks, and host qualification.
+- [0.3.1 release notes](RELEASE_NOTES_0.3.1.md): pairing security fixes, Matrix confirmation and validation scope.
 - [0.3.0 release notes](RELEASE_NOTES_0.3.0.md): changes, validation and remaining release acceptance.
 
 R.O.B. Vision and VirtualGlove are source-cited integration examples. The guides describe Controller Router itself; product installation and gameplay instructions belong to those projects.
@@ -48,4 +49,4 @@ Write each guide for one reader and one purpose. Player Help answers “what do 
 
 ## Next release
 
-[0.3.0 release notes](RELEASE_NOTES_0.3.0.md) record the changes, independent UNO Q runtime version, and the scope of device validation. The 0.2.0 notes remain historical release documentation.
+[0.3.1 release notes](RELEASE_NOTES_0.3.1.md) record the current changes, independent UNO Q runtime version, and the scope of device validation. The 0.3.0 and 0.2.0 notes remain historical release documentation.

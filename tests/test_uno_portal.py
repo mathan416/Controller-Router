@@ -1087,21 +1087,23 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
-    def test_032_bundle_preserves_033_portal_and_matrix(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory); source = root / 'old'; installed = root / 'current'
-            source.mkdir(); installed.mkdir(); (source / 'VERSION').write_text('0.3.2\n')
-            (installed / 'VERSION').write_text((portal_install.SOURCE / 'VERSION').read_text())
-            self.assertEqual((installed / 'VERSION').read_text().strip(), '0.3.3')
-            sentinel = installed / 'preserved'; sentinel.write_text('sentinel')
-            with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
-                 patch.object(portal_install, 'LEGACY', root / 'legacy'), \
-                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
-                 patch.object(portal_install, 'command'), patch.object(portal_install, 'validate_package') as validate, \
-                 patch.object(portal_install, 'install_matrix_app') as matrix:
-                self.assertIn('newer', portal_install.install())
-                validate.assert_not_called(); matrix.assert_not_called()
-            self.assertEqual(sentinel.read_text(), 'sentinel')
+    def test_older_bundles_preserve_034_portal_and_matrix(self):
+        # 0.3.3 is the last runtime without the Matrix-confirmed console changes.
+        for older in ('0.3.2', '0.3.3'):
+            with self.subTest(older=older), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory); source = root / 'old'; installed = root / 'current'
+                source.mkdir(); installed.mkdir(); (source / 'VERSION').write_text(older + '\n')
+                (installed / 'VERSION').write_text((portal_install.SOURCE / 'VERSION').read_text())
+                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.3.4')
+                sentinel = installed / 'preserved'; sentinel.write_text('sentinel')
+                with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
+                     patch.object(portal_install, 'LEGACY', root / 'legacy'), \
+                     patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                     patch.object(portal_install, 'command'), patch.object(portal_install, 'validate_package') as validate, \
+                     patch.object(portal_install, 'install_matrix_app') as matrix:
+                    self.assertIn('newer', portal_install.install())
+                    validate.assert_not_called(); matrix.assert_not_called()
+                self.assertEqual(sentinel.read_text(), 'sentinel')
 
     def test_previous_stable_product_cannot_replace_prepared_runtime(self):
         current = (portal_install.SOURCE / 'VERSION').read_text()

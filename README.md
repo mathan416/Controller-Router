@@ -2,7 +2,7 @@
 
 Controller Router is a Linux input-routing library and optional UNO Q service for retro-gaming projects. It merges configured physical pads and authenticated maker-controller sources into stable Players 1–4 for selected RetroArch launches. It retains EmulationStation mappings and saved emulator settings. **My existing setup** selects the console's existing control path for a system.
 
-VirtualGlove and R.O.B. Vision bundle Router on their Linux consoles and share its UNO Q Matrix portal. Their installers supply the receiver and game-specific behavior; the Python wheel alone does not install a console service. VirtualGlove's Windows LaunchBox path has a separate input implementation. The stable library version is **0.3.2** (UNO Q portal **0.3.5**). Release candidate **0.4.0** (portal **0.4.0**) adds halting the controller when a RetroPie console shuts down.
+VirtualGlove and R.O.B. Vision bundle Router on their Linux consoles and share its UNO Q Matrix portal. Their installers supply the receiver and game-specific behavior; the Python wheel alone does not install a console service. VirtualGlove's Windows LaunchBox path has a separate input implementation. The stable library version is **0.4.0**; the independently versioned UNO Q portal is **0.4.0**.
 
 | Component | Function | Boundary |
 | --- | --- | --- |

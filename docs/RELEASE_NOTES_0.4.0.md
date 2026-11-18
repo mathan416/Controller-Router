@@ -1,6 +1,6 @@
 # Controller Router 0.4.0
 
-Release candidate 1: 18 November 2026. The preceding release was 0.3.2.
+Stable release: 17 November 2026. The preceding release was 0.3.2.
 
 ## Halt the controller when the console shuts down
 
@@ -19,8 +19,8 @@ Release candidate 1: 18 November 2026. The preceding release was 0.3.2.
 
 The reusable library is **0.4.0**; the independent UNO Q runtime installer version is **0.4.0**. The Matrix firmware remains **0.2.0**. Product bundles carrying runtime 0.3.5 or earlier cannot replace the updated portal.
 
-## Validation and remaining acceptance
+## Validation
 
 The source passed the Router suite, including tests for the full console-to-UNO halt flow, every refusal, bad, replayed and expired signatures, the root helper's safety checks, and the entry-page relay, plus bundled-code synchronization and the R.O.B. Vision and VirtualGlove suites.
 
-A development build of this source was installed on one RetroPie console and one UNO Q. With the setting off, the console's EmulationStation hook was refused in under a second and the UNO Q kept running. With it on, choosing **Shutdown System** halted the UNO Q through the helper: its record showed the request, its journal reached System Halt with filesystems synced, and it returned with its usual name after power was restored. Batocera, Recalbox, fresh installation in both product orders, and full rollback were not exercised.
+A development build of this source was installed on one RetroPie console and one UNO Q. With the setting off, the console's EmulationStation hook was refused in under a second and the UNO Q kept running. With it on, choosing **Shutdown System** halted the UNO Q through the helper: its record showed the request, its journal reached System Halt with filesystems synced, and it returned with its usual name after power was restored. Release candidate 1 was then installed from its published assets on both devices with every installer check passing; the UNO Q reported the console connected with both apps ready, and halting stayed on with the helper and EmulationStation hook in place. These are owner-run results for one RetroPie console and one UNO Q. Batocera, Recalbox, fresh installation in both product orders, and full rollback were not exercised.

@@ -13,6 +13,25 @@ class PairingInstallerTests(unittest.TestCase):
         self.environment=patch.dict(os.environ,APPDATA=self.temp.name);self.environment.start()
     def tearDown(self):self.environment.stop();self.platform.stop();self.temp.cleanup()
     def descriptor(self):return {'kind':'json','token_file':str(self.root.parent/'token'),'target_file':str(self.root.parent/'launcher.json')}
+    def test_retropie_shutdown_hook_calls_bounded_notifier_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            hook = Path(directory) / 'scripts/shutdown/controller-router-halt.sh'
+            pairing_install._install_retropie_shutdown_hook(Path('/var/lib/controller-router/notify-shutdown'), hook)
+            text = hook.read_text()
+            self.assertIn('sudo -n /var/lib/controller-router/notify-shutdown', text)
+            self.assertIn('|| true', text)                     # never blocks EmulationStation
+            self.assertTrue(os.access(hook, os.X_OK))
+            self.assertEqual(hook.parent.name, 'shutdown')      # not quit, reboot or restart events
+        self.assertEqual(pairing_install.RETROPIE_SHUTDOWN_HOOK.parent.name, 'shutdown')
+
+    def test_unpaired_console_notifier_does_nothing(self):
+        from router_shared.pairing_console import notify_shutdown
+        with tempfile.TemporaryDirectory() as directory:
+            calls = []
+            result = notify_shutdown(Path(directory), opener=lambda *a, **k: calls.append(a))
+            self.assertIn('not paired', result)
+            self.assertEqual(calls, [])
+
     def test_repeat_install_and_adding_app_keep_connection(self):
         pairing_install.install('virtualglove',self.descriptor(),root=self.root,execute=False)
         write_json(self.root/'connection.json',{'token':'retained-private-secret'})

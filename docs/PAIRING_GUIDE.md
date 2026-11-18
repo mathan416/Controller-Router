@@ -64,6 +64,17 @@ Return to **Pair console > Your consoles** whenever you need to check a link:
 
 Finish any game before changing access or removing a console. To add another console, run its pairing command and repeat the steps above. Existing game filenames and player assignments stay saved.
 
+## Halt the controller when the console shuts down
+
+Each console has a **Halt this controller when the console shuts down** setting. It is off until you turn it on, and turning it on or off asks for the Matrix code like the other changes. When it is on and you choose **Shutdown System** in EmulationStation on a RetroPie console, the console asks this controller to halt Linux cleanly, then finishes its own shutdown.
+
+- **Quit EmulationStation**, **Restart EmulationStation**, and **Restart System** never halt the controller.
+- The controller stays running if a game is active on it or another paired console is connected. The setting shows why below the button.
+- Halting stops Linux; the board stays powered and its lights may stay on. It starts again only when its power is switched off and on.
+- If the controller cannot be reached, the console still shuts down normally.
+
+The setting needs the controller halt helper, which product installation sets up with the root setup step (see the Deployment Guide). Batocera and Recalbox consoles do not send this request yet.
+
 ## If the secure page will not open
 
 Open **Pair console** again from Apps or a product's Setup page. The certificate setup page on port 80 offers device-specific instructions:

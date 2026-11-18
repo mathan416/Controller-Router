@@ -148,6 +148,93 @@ class SharedPairingFlowTests(unittest.TestCase):
         self.assertFalse(self.store.connection)
         self.assertFalse(self.manager.inspect()['consoles'])
 
+    # ---- Halt the controller when the console shuts down ----
+    def _enable_halt(self):
+        self.pair();identity=self.store.console_id
+        (self.manager.root/'.halt-enabled').write_text('')
+        start=self.manager.operation({'operation':'halt','id':identity,'enabled':True})
+        self.assertFalse(self.manager.inspect()['consoles'][0]['halt_on_shutdown'])  # not until confirmed
+        self.manager.confirm(start['session'],self.matrix.pin)
+        self.assertTrue(self.manager.inspect()['consoles'][0]['halt_on_shutdown'])
+        return identity
+
+    def _notify(self):
+        """Run the console's real notifier against this UNO-side manager."""
+        import io
+        from unittest.mock import patch
+        from router_shared.pairing_console import notify_shutdown
+        manager=self.manager
+        class Reply(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self,*_): self.close()
+        def opener(request,timeout):
+            self.assertEqual(request.full_url,'http://uno.local/api/console-halt')
+            try:
+                result=manager.console_halt(json.loads(request.data))
+            except ValueError as error:
+                result={'error':str(error)}
+            return Reply(json.dumps(result).encode())
+        class ImmediateTimer:
+            def __init__(timer,delay,action): timer.action=action
+            def start(timer): timer.action()
+        with patch('uno_portal.host.pairing.threading.Timer',ImmediateTimer):
+            return notify_shutdown(self.store.root,opener=opener)
+
+    def test_console_shutdown_halts_controller_when_allowed(self):
+        self._enable_halt()
+        self.assertEqual(self._notify(),'The controller will halt.')
+        self.assertEqual((self.manager.root/'halt-request').read_text(),'halt\n')
+        self.assertIn('Halt requested',self.manager.inspect()['consoles'][0]['halt_message'])
+        self.assertNotIn(self.store.connection['token'],json.dumps(self.manager.inspect()))
+
+    def test_console_shutdown_is_refused_when_off_busy_or_shared(self):
+        self.pair()
+        self.assertIn('may not halt',self._notify())                    # off by default
+        self.assertFalse((self.manager.root/'halt-request').exists())
+        self.manager.document['consoles']={};write_json(self.store.root/'window.json',{'authorization':'ABCDEFGHIJKL','expires':1000})
+        identity=self._enable_halt()
+        self.active=True
+        self.assertIn('game was running',self._notify())
+        self.assertIn('Not halted',self.manager.inspect()['consoles'][0]['halt_message'])
+        self.active=False
+        self.manager.document['consoles']['f'*32]={'host':'other.local','platform':'retropie','status':'Connected',
+                                                    'token':secret(),'fingerprint':'b'*64,'apps':{}}
+        self.assertIn('Another paired console',self._notify())
+        del self.manager.document['consoles']['f'*32]
+        (self.manager.root/'.halt-enabled').unlink()
+        self.assertIn('helper is not installed',self._notify())
+        self.assertFalse((self.manager.root/'halt-request').exists())
+
+    def test_halt_request_needs_fresh_signed_single_use_challenge(self):
+        from router_shared.pairing import halt_proof
+        identity=self._enable_halt();token=self.store.connection['token'];uno=self.manager.document['uno_id']
+        nonce=self.manager.halt_challenge(identity)['nonce']
+        with self.assertRaisesRegex(ValueError,'not verified'):
+            self.manager.halt_request(identity,nonce,'0'*64)            # wrong signature
+        with self.assertRaisesRegex(ValueError,'not verified'):
+            self.manager.halt_request(identity,nonce,halt_proof(token,uno,identity,nonce))  # nonce already used
+        nonce=self.manager.halt_challenge(identity)['nonce']
+        self.manager.clock=lambda:100+31
+        with self.assertRaisesRegex(ValueError,'not verified'):
+            self.manager.halt_request(identity,nonce,halt_proof(token,uno,identity,nonce))  # expired
+        self.manager.clock=lambda:100
+        nonce=self.manager.halt_challenge(identity)['nonce']
+        legacy_style=__import__('router_shared.pairing',fromlist=['legacy_proof']).legacy_proof(token,nonce,identity,uno)
+        with self.assertRaisesRegex(ValueError,'not verified'):
+            self.manager.halt_request(identity,nonce,legacy_style)       # another proof type cannot pass
+        self.assertFalse((self.manager.root/'halt-request').exists())
+
+    def test_halt_setting_needs_helper_and_survives_repairing(self):
+        self.pair();identity=self.store.console_id
+        with self.assertRaisesRegex(ValueError,'halt helper'):
+            self.manager.operation({'operation':'halt','id':identity,'enabled':True})
+        self.assertFalse(self.manager.inspect()['halt_helper'])
+        self.manager.document['consoles']={};write_json(self.store.root/'window.json',{'authorization':'ABCDEFGHIJKL','expires':1000})
+        self._enable_halt()
+        write_json(self.store.root/'window.json',{'authorization':'ABCDEFGHIJKL','expires':1000})
+        self.pair()                                                       # pair the same console again
+        self.assertTrue(self.manager.inspect()['consoles'][0]['halt_on_shutdown'])
+
     def test_browser_remove_and_access_need_matrix_code(self):
         self.pair();identity=self.store.console_id
         start=self.manager.operation({'operation':'remove','id':identity})

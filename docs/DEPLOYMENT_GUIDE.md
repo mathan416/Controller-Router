@@ -104,6 +104,20 @@ sudo python3 -m router_shared.uno_boot_order
 
 The helper creates an ordering-only systemd drop-in and reloads systemd; it does not restart either service or enable a disabled bootloader writer. It installs the rule even when the writer is not yet present, so a later App Lab system initialization can add the writer without leaving an ordering gap. The rule takes effect on the next start or boot. When both enabled units are in the same boot transaction, App Lab starts after the oneshot writer finishes. It does not serialize manual starts of the writer after App Lab is already running or resolve unrelated SWD or firmware errors. A R.O.B. Vision-only installation needs this explicit root step; run it from the installed R.O.B. Vision directory so Python can find its bundled Router package. A disabled writer remains disabled; if it is enabled later, the ordering rule is already present. Review any conflicting existing drop-in rather than overwriting it.
 
+## UNO Q halt on console shutdown
+
+Router can halt the UNO Q when a paired RetroPie console shuts down, if the owner turns this on for that console in secure Setup. The UNO Q Router service runs as `arduino` and cannot halt Linux, so a fixed-purpose root helper does it. Install it with the same root step as the ordering helper:
+
+```sh
+sudo python3 -m router_shared.uno_halt
+```
+
+The helper writes `controller-router-halt.path`, `controller-router-halt.service`, and a tmpfiles rule that creates Router's `.halt-enabled` marker. The path unit watches only `/home/arduino/.local/state/controller-router/halt-request`; the service removes it and runs `systemctl --no-block halt`. Installation refuses to proceed while a request is pending and does not overwrite unrelated files with these names.
+
+On the console, the link installer adds a root-only `notify-shutdown` launcher and an EmulationStation `shutdown` event script, which runs only for **Shutdown System**. The notifier requests a one-time challenge from `POST /api/console-halt` on the UNO Q entry page, signs it with the console's Router connection token under the `controller-router-halt/1` label, and sends the signature; the token itself is never sent. Each step times out after two seconds and the console always continues its shutdown. The event script uses `sudo -n`, so the `pi` account needs RetroPie's usual passwordless sudo.
+
+The UNO Q accepts a request only when the signature and an unexpired, unused challenge match a paired console with the setting turned on, the helper is installed, no product reports a live game, and no other paired console is connected. It records the outcome on the console's Setup row and writes the halt request two seconds after replying.
+
 ## Optional UNO Q runtime
 
 The port-80 chooser links to **Setup** for Players and Systems and to **Pair console** on HTTPS port 8444. Router owns the console registry and authenticated console management connection. Product adapters retain game actions and scoped app credentials. Assignment changes take effect on the next launch.

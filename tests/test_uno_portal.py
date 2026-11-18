@@ -891,6 +891,39 @@ class WebTests(unittest.TestCase):
         finally:
             server.shutdown();server.server_close()
 
+    def test_every_portal_page_links_to_secure_console_setup(self):
+        pages = Path(web.__file__).parent
+        for name in ('index.html', 'setup.html', 'help.html', 'trust.html'):
+            with self.subTest(page=name):
+                text = (pages / name).read_text()
+                self.assertIn('>Console setup</a>', text)
+                self.assertIn("':8444/setup'", text)
+
+    def test_console_halt_relays_only_its_fields_and_reports_refusals(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        port = server.server_address[1]
+        try:
+            body = dumps({'operation': 'request', 'console_id': 'a' * 32, 'nonce': 'n',
+                               'proof': 'p', 'action': 'select', 'app': 'virtualglove'})
+            with patch.object(web, 'broker', side_effect=[{'halting': True}, {'error': 'refused'}]) as call:
+                for status in (200, 400):
+                    connection = HTTPConnection('127.0.0.1', port)
+                    connection.request('POST', '/api/console-halt', body, {'Content-Type': 'application/json'})
+                    response = connection.getresponse(); self.assertEqual(response.status, status)
+                    response.read(); connection.close()
+            # A smuggled "action" cannot turn a halt request into an app selection.
+            call.assert_called_with({'action': 'console-halt', 'operation': 'request',
+                                     'console_id': 'a' * 32, 'nonce': 'n', 'proof': 'p'})
+            with patch.object(web, 'broker') as call:
+                connection = HTTPConnection('127.0.0.1', port)
+                connection.request('POST', '/api/console-halt', dumps({'pad': 'x' * 600}),
+                                   {'Content-Type': 'application/json'})
+                self.assertEqual(connection.getresponse().status, 400); connection.close()
+                call.assert_not_called()
+        finally:
+            server.shutdown(); server.server_close()
+
     def test_cross_site_switch_is_rejected_and_same_origin_is_accepted(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), web.Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -1087,14 +1120,14 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
-    def test_older_bundles_preserve_035_portal_and_matrix(self):
-        # 0.3.3 lacks the Matrix-confirmed console changes; 0.3.4 lacks the lease fix.
-        for older in ('0.3.2', '0.3.3', '0.3.4'):
+    def test_older_bundles_preserve_040_portal_and_matrix(self):
+        # 0.3.3 lacks Matrix-confirmed changes, 0.3.4 the lease fix, 0.3.5 halt on console shutdown.
+        for older in ('0.3.2', '0.3.3', '0.3.4', '0.3.5'):
             with self.subTest(older=older), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory); source = root / 'old'; installed = root / 'current'
                 source.mkdir(); installed.mkdir(); (source / 'VERSION').write_text(older + '\n')
                 (installed / 'VERSION').write_text((portal_install.SOURCE / 'VERSION').read_text())
-                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.3.5')
+                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.4.0')
                 sentinel = installed / 'preserved'; sentinel.write_text('sentinel')
                 with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
                      patch.object(portal_install, 'LEGACY', root / 'legacy'), \

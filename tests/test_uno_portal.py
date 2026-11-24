@@ -1360,6 +1360,24 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
+    def test_second_router_install_is_refused_while_one_runs(self):
+        import fcntl
+        import os
+        with tempfile.TemporaryDirectory() as directory:
+            dest = Path(directory) / 'controller-router-portal'
+            with patch.object(portal_install, 'DEST', dest), \
+                 patch.object(portal_install.os, 'geteuid', return_value=1000), \
+                 patch.object(portal_install, '_install', return_value='installed') as run:
+                held = os.open(Path(directory) / '.controller-router-install.lock', os.O_CREAT | os.O_RDWR)
+                try:
+                    fcntl.flock(held, fcntl.LOCK_EX)
+                    with self.assertRaisesRegex(RuntimeError, 'already running'):
+                        portal_install.install()
+                    run.assert_not_called()
+                finally:
+                    os.close(held)
+                self.assertEqual(portal_install.install(), 'installed')
+
     def test_older_bundles_preserve_041_portal_and_matrix(self):
         # 0.3.3 lacks Matrix-confirmed changes, 0.3.4 the lease fix, 0.3.5 halt on console shutdown,
         # 0.4.0 the base image that follows App Lab and the low-disk warning.

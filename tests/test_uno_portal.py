@@ -284,7 +284,8 @@ class BaseImageTests(unittest.TestCase):
         # Each extra python-apps-base tag costs about 900 MB on the UNO Q.
         compose = Path(products.__file__).with_name('portal-compose.yaml').read_text()
         images = set(re.findall(r'^\s*image:\s*(\S+)\s*$', compose, re.M))
-        self.assertEqual(images, {products.IMAGE})
+        self.assertEqual(images, {'${%s:-%s}' % (products.IMAGE_VARIABLE, products.IMAGE)})
+        self.assertEqual(products.ENTRY_PROJECT, broker.ENTRY_PROJECT)
         self.assertTrue(products.IMAGE.startswith('ghcr.io/arduino/app-bricks/python-apps-base:'))
         with patch.object(products.subprocess, 'check_output', return_value='192.0.2.5\n'):
             for name in products.PRODUCTS:
@@ -554,6 +555,7 @@ class PortTests(unittest.TestCase):
             compose.parent.mkdir()
             compose.write_text('services: {}\n')
             with patch.object(broker, 'PORTAL', portal), \
+                 patch.object(broker, 'entry_environment', return_value={'E': '1'}), \
                  patch.object(broker, 'portal_ready', side_effect=[False, False, True]), \
                  patch.object(broker.subprocess, 'run') as run, \
                  isolated_sleep(broker) as pause:
@@ -577,6 +579,7 @@ class PortTests(unittest.TestCase):
             conflict = subprocess.CalledProcessError(1, ['docker', 'compose'],
                                                      stderr='Bind for 0.0.0.0:80 failed: port is already allocated\n')
             with patch.object(broker, 'PORTAL', portal), \
+                 patch.object(broker, 'entry_environment', return_value={'E': '1'}), \
                  patch.object(broker, 'portal_ready', return_value=False), \
                  patch.object(broker.subprocess, 'run', side_effect=conflict):
                 with self.assertRaisesRegex(RuntimeError, 'port is already allocated'):
@@ -618,6 +621,7 @@ class PortTests(unittest.TestCase):
             compose.parent.mkdir()
             compose.write_text('services: {}\n')
             with patch.object(broker, 'PORTAL', portal), \
+                 patch.object(broker, 'entry_environment', return_value={'E': '1'}), \
                  patch.object(broker, 'portal_ready', return_value=False) as ready, \
                  patch.object(broker.subprocess, 'run') as run, \
                  isolated_sleep(broker) as pause:
@@ -627,7 +631,7 @@ class PortTests(unittest.TestCase):
             self.assertEqual(pause.call_count, 10)
             run.assert_called_once_with(
                 ['docker', 'compose', '-p', broker.ENTRY_PROJECT, '-f', str(compose), 'up', '-d'],
-                check=True, capture_output=True, text=True, timeout=90)
+                env={'E': '1'}, check=True, capture_output=True, text=True, timeout=90)
 
     def test_entry_watchdog_deduplicates_errors_and_recovers(self):
         failures = [OSError('offline'), OSError('offline'), None, OSError('offline')]
@@ -1115,6 +1119,51 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(services["avahi-resolver"]["image"], products.IMAGE)
             self.assertEqual(services["other"]["image"], "example/other:1")
 
+    def test_base_image_follows_app_lab_router_within_the_supported_range(self):
+        repository = products.BASE_REPOSITORY
+        for found, expected in [
+            (f"{repository}:0.14.0\n", f"{repository}:0.14.0"),
+            (f"{repository}:0.12.0\n", f"{repository}:0.12.0"),
+            (f"{repository}:0.11.9\n", products.IMAGE),   # older than supported
+            (f"{repository}:latest\n", products.IMAGE),   # not a release tag
+            ("example/other:0.14.0\n", products.IMAGE),   # not the base image
+            ("", products.IMAGE),                           # no App Lab Router container
+        ]:
+            with self.subTest(found=found):
+                result = subprocess.CompletedProcess([], 0 if found else 1, found, "")
+                with patch.object(products.subprocess, "run", return_value=result) as run:
+                    self.assertEqual(products.base_image(), expected)
+                self.assertEqual(run.call_args[0][0][-1], products.APP_LAB_ROUTER)
+        with patch.object(products.subprocess, "run", side_effect=OSError("no docker")):
+            self.assertEqual(products.base_image(), products.IMAGE)
+
+    def test_clean_runtime_and_entry_use_the_resolved_base_image(self):
+        image = products.BASE_REPOSITORY + ":0.14.0"
+        with patch.object(products.subprocess, "check_output", return_value="192.0.2.5\n"):
+            services = products.clean_compose("virtualglove", image)["services"].values()
+        self.assertEqual({service["image"] for service in services}, {image})
+        self.assertEqual(products.entry_environment(image)[products.IMAGE_VARIABLE], image)
+
+    def test_entry_moves_only_when_running_on_another_image(self):
+        image = products.BASE_REPOSITORY + ":0.14.0"
+        with tempfile.TemporaryDirectory() as directory:
+            compose = Path(directory) / "portal-compose.yaml"
+            compose.write_text("services: {}\n")
+            for running, moved in [(products.BASE_REPOSITORY + ":0.13.2", True),
+                                   (image, False), ("", False)]:
+                with self.subTest(running=running):
+                    with patch.object(products, "ENTRY_COMPOSE", compose), \
+                         patch.object(products, "_container_image", return_value=running), \
+                         patch.object(products.subprocess, "run") as run:
+                        self.assertEqual(products.refresh_entry(image), moved)
+                    if moved:
+                        command = run.call_args[0][0]
+                        self.assertEqual(command[-2:], ["up", "-d"])
+                        self.assertIn(products.ENTRY_PROJECT, command)
+                        self.assertEqual(run.call_args[1]["env"][products.IMAGE_VARIABLE], image)
+                    else:
+                        run.assert_not_called()
+
     def test_start_all_retires_only_older_unused_base_images(self):
         repository = products.BASE_REPOSITORY
         calls = []
@@ -1123,20 +1172,26 @@ class InstallerTests(unittest.TestCase):
             calls.append(command[1:])
             result = subprocess.CompletedProcess(command, 0, "", "")
             if command[1:3] == ["image", "ls"]:
-                result.stdout = "0.14.0\n0.13.2\n0.12.0\n0.11.1\nlatest\n"
-            elif command[1] == "ps" and command[4] == f"ancestor={repository}:0.12.0":
+                result.stdout = "0.14.0\n0.13.2\n0.12.0\n0.11.1\n0.10.0\nlatest\n"
+            elif command[1] == "ps" and "-q" not in command and \
+                    command[4] == f"ancestor={repository}:0.12.0":
                 result.stdout = "abc rob-vision\ndef someone-else\nghi\n"
-            elif command[1:3] == ["image", "rm"] and command[3].endswith(":0.11.1"):
-                result.returncode = 1  # still used by a running container
+            elif command[1] == "ps" and "-q" in command and \
+                    command[-1] == f"ancestor={repository}:0.11.1":
+                # Still used, e.g. the image also carries a tag a container runs on:
+                # Docker would only untag it, so it must not be removed at all.
+                result.stdout = "xyz\n"
+            elif command[1:3] == ["image", "rm"] and command[3].endswith(":0.10.0"):
+                result.returncode = 1
             return result
 
         with patch.object(products.subprocess, "run", side_effect=docker):
-            removed = products.retire_old_base_images()
+            removed = products.retire_old_base_images(products.BASE_REPOSITORY + ":0.13.2")
         self.assertEqual(removed, [f"{repository}:0.12.0"])
         self.assertIn(["rm", "abc"], calls)
         self.assertFalse([call for call in calls if call[0] == "rm" and call != ["rm", "abc"]])
         attempted = [call[2] for call in calls if call[:2] == ["image", "rm"]]
-        self.assertEqual(attempted, [f"{repository}:0.12.0", f"{repository}:0.11.1"])
+        self.assertEqual(attempted, [f"{repository}:0.12.0", f"{repository}:0.10.0"])
         self.assertFalse([call for call in calls if "-f" in call or "--force" in call])
         with patch.object(products.subprocess, "run", side_effect=OSError("no docker")):
             self.assertEqual(products.retire_old_base_images(), [])
@@ -1204,6 +1259,7 @@ class InstallerTests(unittest.TestCase):
                     if fail:
                         raise RuntimeError('controlled start failure')
                 response = unittest.mock.MagicMock(); response.__enter__.return_value.status = 200
+                retire_images = unittest.mock.Mock()
                 from contextlib import ExitStack
                 patches = [
                     patch.object(portal_install, 'SOURCE', source),
@@ -1224,6 +1280,7 @@ class InstallerTests(unittest.TestCase):
                     patch.object(portal_install, 'start_products'),
                     patch.object(portal_install, 'urlopen', return_value=response),
                     patch.object(portal_install, 'wait_secure_setup'),
+                    patch.object(portal_install, 'retire_base_images', new=retire_images),
                     patch.object(portal_install, 'retire_early_start', side_effect=RuntimeError('finished'))
                 ]
                 with ExitStack() as stack:
@@ -1231,6 +1288,8 @@ class InstallerTests(unittest.TestCase):
                         stack.enter_context(item)
                     with self.assertRaisesRegex(RuntimeError, 'controlled start failure' if fail else 'finished'):
                         portal_install.install()
+                # Old base images go only once the new Router answers on port 80.
+                self.assertEqual(retire_images.call_count, 0 if fail else 1)
                 with lock.open('r+') as handle:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)

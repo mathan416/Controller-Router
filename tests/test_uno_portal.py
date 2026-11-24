@@ -839,6 +839,53 @@ class PortTests(unittest.TestCase):
                     self.assertEqual(run.call_count, 1)
 
 
+class DiskSpaceTests(unittest.TestCase):
+    @staticmethod
+    def statvfs(free_blocks, total_blocks=2_500_000, block=4096):
+        from types import SimpleNamespace
+        return SimpleNamespace(f_bavail=free_blocks, f_frsize=block, f_blocks=total_blocks)
+
+    def test_system_disk_reports_space_the_arduino_user_can_use(self):
+        threshold_blocks = broker.LOW_DISK_BYTES // 4096
+        for free_blocks, low in [(threshold_blocks - 1, True), (threshold_blocks, False),
+                                 (850_000, False), (0, True)]:
+            with self.subTest(free_blocks=free_blocks), \
+                 patch.object(broker.os, 'statvfs', return_value=self.statvfs(free_blocks)) as stat:
+                disk = broker.system_disk()
+            stat.assert_called_once_with('/')
+            self.assertEqual(disk, {'free': free_blocks * 4096, 'total': 2_500_000 * 4096, 'low': low})
+        with patch.object(broker.os, 'statvfs', side_effect=OSError('gone')):
+            self.assertIsNone(broker.system_disk())
+
+    def test_state_carries_disk_space_without_changing_launcher_state(self):
+        from io import BytesIO
+        launcher_state = {'apps': {}, 'matrix': {}}
+        for disk in ({'free': 1, 'total': 2, 'low': True}, None):
+            with self.subTest(disk=disk):
+                handler = object.__new__(broker.Handler)
+                handler.rfile, handler.wfile = BytesIO(b'{"action": "state"}\n'), BytesIO()
+                with patch.object(broker, 'LAUNCHER') as launcher, \
+                     patch.object(broker, 'system_disk', return_value=disk):
+                    launcher.state.return_value = launcher_state
+                    handler.handle()
+                reply = loads(handler.wfile.getvalue())
+                self.assertEqual(reply.get('disk'), disk)
+                self.assertEqual(reply['apps'], {})
+                self.assertNotIn('disk', launcher_state)
+
+    def test_chooser_warns_and_stays_put_while_the_disk_is_low(self):
+        page = web.PAGE.read_text()
+        self.assertIn('id="disk" role="alert" hidden', page)
+        self.assertIn('href="/help#space"', page)
+        self.assertIn('installed.length === 1 && !lowDisk &&', page)
+        # Rewriting the alert on every poll would re-announce it and drop focus.
+        self.assertIn('if (disk.dataset.text !== text)', page)
+        help_page = web.PAGE.with_name('help.html').read_text()
+        self.assertIn('<section id="space">', help_page)
+        self.assertIn('href="#space"', help_page)
+        self.assertIn('docker builder prune -a -f', help_page)
+
+
 class SwitchTests(unittest.TestCase):
     def test_host_uses_running_services_without_app_lab_switching(self):
         from uno_portal.host.concurrent import ConcurrentLauncher

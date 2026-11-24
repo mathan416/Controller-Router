@@ -1094,6 +1094,53 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(loads(output.read_text())["networks"]["default"]["name"],
                              "virtualglove-runtime_default")
 
+    def test_runtime_moves_cached_app_lab_services_to_the_router_base_image(self):
+        # An App Lab cache written before an App Lab update names the old image.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "virtualglove/.cache").mkdir(parents=True)
+            (root / "virtualglove/.cache/app-compose.yaml").write_text("services: {}\n")
+            old = products.BASE_REPOSITORY + ":0.12.0"
+            cached = {"services": {"main": {"image": old, "volumes": []},
+                                   "avahi-resolver": {"image": old},
+                                   "other": {"image": "example/other:1"}}}
+            with patch.object(products, "ROOT", root), \
+                 patch.object(products, "RUNTIME", root / "runtime"), \
+                 patch.object(products, "SOCKET_DIR", root / "socket"), \
+                 patch.object(products.subprocess, "run") as run:
+                run.return_value.stdout = dumps(cached)
+                output = products.product_compose("virtualglove")
+            services = loads(output.read_text())["services"]
+            self.assertEqual(services["main"]["image"], products.IMAGE)
+            self.assertEqual(services["avahi-resolver"]["image"], products.IMAGE)
+            self.assertEqual(services["other"]["image"], "example/other:1")
+
+    def test_start_all_retires_only_older_unused_base_images(self):
+        repository = products.BASE_REPOSITORY
+        calls = []
+
+        def docker(command, **_):
+            calls.append(command[1:])
+            result = subprocess.CompletedProcess(command, 0, "", "")
+            if command[1:3] == ["image", "ls"]:
+                result.stdout = "0.14.0\n0.13.2\n0.12.0\n0.11.1\nlatest\n"
+            elif command[1] == "ps" and command[4] == f"ancestor={repository}:0.12.0":
+                result.stdout = "abc rob-vision\ndef someone-else\nghi\n"
+            elif command[1:3] == ["image", "rm"] and command[3].endswith(":0.11.1"):
+                result.returncode = 1  # still used by a running container
+            return result
+
+        with patch.object(products.subprocess, "run", side_effect=docker):
+            removed = products.retire_old_base_images()
+        self.assertEqual(removed, [f"{repository}:0.12.0"])
+        self.assertIn(["rm", "abc"], calls)
+        self.assertFalse([call for call in calls if call[0] == "rm" and call != ["rm", "abc"]])
+        attempted = [call[2] for call in calls if call[:2] == ["image", "rm"]]
+        self.assertEqual(attempted, [f"{repository}:0.12.0", f"{repository}:0.11.1"])
+        self.assertFalse([call for call in calls if "-f" in call or "--force" in call])
+        with patch.object(products.subprocess, "run", side_effect=OSError("no docker")):
+            self.assertEqual(products.retire_old_base_images(), [])
+
     def test_product_runtime_omits_only_stale_optional_led_binds(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

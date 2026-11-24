@@ -1360,6 +1360,43 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
+    def test_retired_files_and_local_backups_never_reach_the_installed_portal(self):
+        # A product's copy of the portal can keep files from older installs.
+        packaged = portal_install.packaged
+        for path, expected in [('install.py', True), ('app/app.yaml', True), ('host/broker.py', True),
+                               ('app.yaml', False), ('bricks', False),
+                               ('bricks/local/host_bridge/brick_config.yaml', False),
+                               ('install.py.before-preflight-20260927', False),
+                               ('host/broker.py.before-router-session-routing', False)]:
+            with self.subTest(path=path):
+                self.assertEqual(packaged(Path(path)), expected)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, installed = root / 'source', root / 'installed'
+            for base in (source, installed):
+                (base / 'app').mkdir(parents=True)
+                (base / 'install.py').write_text('installer\n')
+                (base / 'app/app.yaml').write_text('name: Controller Router\n')
+            for stray in ('app.yaml', 'bricks/local/host_bridge/brick_config.yaml',
+                          'install.py.before-preflight-20260927'):
+                (source / stray).parent.mkdir(parents=True, exist_ok=True)
+                (source / stray).write_text('old\n')
+            # Strays in the product's copy must not force a full install ...
+            self.assertTrue(portal_install.matching_static_payload(source, installed))
+            # ... must not be copied in ...
+            with patch.object(portal_install, 'SOURCE', source):
+                shutil.copytree(source, root / 'staged', ignore=portal_install.ignore_unpackaged)
+            staged = sorted(str(path.relative_to(root / 'staged')) for path in (root / 'staged').rglob('*'))
+            self.assertEqual(staged, ['app', 'app/app.yaml', 'install.py'])
+            # ... and any already installed are removed, keeping package files.
+            for stray in ('app.yaml', 'bricks/local/host_bridge/brick_compose.yaml',
+                          'install.py.before-preflight-20260927'):
+                (installed / stray).parent.mkdir(parents=True, exist_ok=True)
+                (installed / stray).write_text('old\n')
+            portal_install.remove_unpackaged(installed)
+            left = sorted(str(path.relative_to(installed)) for path in installed.rglob('*'))
+            self.assertEqual(left, ['app', 'app/app.yaml', 'install.py'])
+
     def test_second_router_install_is_refused_while_one_runs(self):
         import fcntl
         import os

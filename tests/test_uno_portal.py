@@ -279,6 +279,19 @@ class RepeatPortalInstallTests(unittest.TestCase):
             self.assertEqual((installed / 'host/products.py').read_text(), 'old launcher\n')
 
 
+class BaseImageTests(unittest.TestCase):
+    def test_portal_and_products_share_one_app_lab_base_image(self):
+        # Each extra python-apps-base tag costs about 900 MB on the UNO Q.
+        compose = Path(products.__file__).with_name('portal-compose.yaml').read_text()
+        images = set(re.findall(r'^\s*image:\s*(\S+)\s*$', compose, re.M))
+        self.assertEqual(images, {products.IMAGE})
+        self.assertTrue(products.IMAGE.startswith('ghcr.io/arduino/app-bricks/python-apps-base:'))
+        with patch.object(products.subprocess, 'check_output', return_value='192.0.2.5\n'):
+            for name in products.PRODUCTS:
+                services = products.clean_compose(name)['services'].values()
+                self.assertEqual({service['image'] for service in services}, {products.IMAGE})
+
+
 class MatrixComposePortTests(unittest.TestCase):
 
 

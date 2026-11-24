@@ -1360,14 +1360,15 @@ class InstallerTests(unittest.TestCase):
                                  ("python3", str(installed / "host/products.py"), "start-all"))
                 self.assertEqual(len(command.call_args_list), 3)
 
-    def test_older_bundles_preserve_040_portal_and_matrix(self):
-        # 0.3.3 lacks Matrix-confirmed changes, 0.3.4 the lease fix, 0.3.5 halt on console shutdown.
-        for older in ('0.3.2', '0.3.3', '0.3.4', '0.3.5'):
+    def test_older_bundles_preserve_041_portal_and_matrix(self):
+        # 0.3.3 lacks Matrix-confirmed changes, 0.3.4 the lease fix, 0.3.5 halt on console shutdown,
+        # 0.4.0 the base image that follows App Lab and the low-disk warning.
+        for older in ('0.3.2', '0.3.3', '0.3.4', '0.3.5', '0.4.0'):
             with self.subTest(older=older), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory); source = root / 'old'; installed = root / 'current'
                 source.mkdir(); installed.mkdir(); (source / 'VERSION').write_text(older + '\n')
                 (installed / 'VERSION').write_text((portal_install.SOURCE / 'VERSION').read_text())
-                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.4.0')
+                self.assertEqual((installed / 'VERSION').read_text().strip(), '0.4.1')
                 sentinel = installed / 'preserved'; sentinel.write_text('sentinel')
                 with patch.object(portal_install, 'SOURCE', source), patch.object(portal_install, 'DEST', installed), \
                      patch.object(portal_install, 'LEGACY', root / 'legacy'), \

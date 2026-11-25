@@ -2,7 +2,7 @@
 
 Controller Router is a Linux input-routing library and optional UNO Q service for retro-gaming projects. It merges configured physical pads and authenticated maker-controller sources into stable Players 1–4 for selected RetroArch launches. It retains EmulationStation mappings and saved emulator settings. **My existing setup** selects the console's existing control path for a system.
 
-VirtualGlove and R.O.B. Vision bundle Router on their Linux consoles and share its UNO Q Matrix portal. Their installers supply the receiver and game-specific behavior; the Python wheel alone does not install a console service. VirtualGlove's Windows LaunchBox path has a separate input implementation. The stable library version is **0.4.0**; the independently versioned UNO Q portal is **0.4.0**.
+VirtualGlove and R.O.B. Vision bundle Router on their Linux consoles and share its UNO Q Matrix portal. Their installers supply the receiver and game-specific behavior; the Python wheel alone does not install a console service. VirtualGlove's Windows LaunchBox path has a separate input implementation. The stable library version is **0.4.1**; the independently versioned UNO Q portal is **0.4.1**.
 
 | Component | Function | Boundary |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ VirtualGlove and R.O.B. Vision bundle Router on their Linux consoles and share i
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md): package and upgrade a Router integration.
 - [Optional Emulator Adapters](docs/EMULATOR_ADAPTERS.md): qualified computer bridges and host-specific DICE/Flycast support.
 - [Technical Reference](docs/TECHNICAL_REFERENCE.md): APIs, leases, Matrix display, storage, and failure behaviour.
+- [0.4.1 release notes](docs/RELEASE_NOTES_0.4.1.md): one App Lab base image on the UNO Q, a low-disk warning, and safer Router installs.
 - [0.4.0 release notes](docs/RELEASE_NOTES_0.4.0.md): halt the controller when the console shuts down, and a Console setup link on every portal page.
 - [0.3.2 release notes](docs/RELEASE_NOTES_0.3.2.md): UNO Q input leases survive a product reinstall without a lasting error.
 - [0.3.1 release notes](docs/RELEASE_NOTES_0.3.1.md): pairing security fixes, Matrix confirmation for console changes, and lower console CPU use.
